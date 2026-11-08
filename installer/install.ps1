@@ -151,7 +151,9 @@ try {
   # GitHub needs TLS 1.2, which older Windows PowerShell doesn't turn on by itself.
   [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
   if (-not $Uninstall) {
-    if (-not $Server) { $Server = Read-Answer 'Server address (from whoever gave you your access key)' $DefaultServer }
+    # Downloaded from a server's own /dstream/dl, the installer is for that server.
+    if (-not $Server) { $Server = $DefaultServer }
+    if (-not $Server) { $Server = Read-Answer 'Server address (from whoever gave you your access key)' '' }
     if (-not $Server) { Fail 'no server given. Usage: install.ps1 -Server https://example.com <access-key>' }
     # Accept "example.com" and trailing slashes, as people paste them.
     $Server = $Server.Trim().TrimEnd('/')

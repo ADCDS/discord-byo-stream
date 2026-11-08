@@ -157,7 +157,8 @@ Depois rode `docker compose up -d` e acrescente a rota `/dstream/*` do
 ## Servindo o instalador você mesmo (opcional)
 
 Normalmente as pessoas baixam o BYO Stream do GitHub. Você também pode servir os
-arquivos pelo seu servidor, com o seu endereço já sugerido como resposta. Num
+arquivos pelo seu servidor. Esse instalador já vem com o seu servidor, então as
+pessoas só digitam a chave. Num
 computador com Node.js 22, numa cópia deste repositório:
 
 ```sh

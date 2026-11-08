@@ -153,7 +153,7 @@ Then run `docker compose up -d`, and add the `/dstream/*` route from
 ## Serving the installer yourself (optional)
 
 Normally people download BYO Stream from GitHub. You can also serve it from your
-server, with your address already filled in as the suggested answer. On a computer
+server. That installer is already set to your server, so people only type their key. On a computer
 with Node.js 22, in a copy of this repository:
 
 ```sh

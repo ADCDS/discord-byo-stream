@@ -66,8 +66,10 @@ ask() { # $1 = question, $2 = suggested answer
 }
 
 if [ -z "$UNINSTALL" ]; then
+  # Downloaded from a server's own /dstream/dl, the installer is for that server.
+  [ -n "$SERVER" ] || SERVER=$DEFAULT_SERVER
   if [ -z "$SERVER" ]; then
-    SERVER=$(ask "Server address (from whoever gave you your access key)" "$DEFAULT_SERVER") ||
+    SERVER=$(ask "Server address (from whoever gave you your access key)" "") ||
       fail "no server given. Usage: sh install.sh --server https://example.com <access-key>"
   fi
   # Accept "example.com" and trailing slashes, as people paste them.

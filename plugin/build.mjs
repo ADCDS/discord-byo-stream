@@ -4,7 +4,7 @@
 //
 //   node build.mjs
 //       The files a server hands out at <server>/dstream/dl (into dist/public). The
-//       installer downloads from there and suggests that server. The server comes from
+//       installer downloads from there and installs for that server. The server comes from
 //       byo-stream.config.json, or BYO_SERVER.
 //   BYO_RELEASE=linux|macos|windows node build.mjs
 //       The files for a GitHub release (into dist/release-files/<platform>). The
@@ -66,4 +66,4 @@ for (const file of ["main.js", "app-index.js", "audio-source.js", "linux-audio.j
   if (/__BYO_[A-Z_]+__/.test(text)) throw new Error(`${file} has an unknown placeholder: ${text.match(/__BYO_[A-Z_]+__/)[0]}`);
   writeFileSync(join(outDir, file), text);
 }
-console.log(`built ${outDir}: downloads from ${payloadUrl}, ${defaultServer ? `suggests ${defaultServer}` : "asks for the server"}`);
+console.log(`built ${outDir}: downloads from ${payloadUrl}, ${defaultServer ? `installs for ${defaultServer}` : "asks for the server"}`);
