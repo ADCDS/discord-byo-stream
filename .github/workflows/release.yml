@@ -1,0 +1,66 @@
+# Push a tag named linux-v<version>, macos-v<version> or windows-v<version> to build,
+# test and publish that platform's release. <version> must match plugin/package.json.
+# Set the repository variable VCSTREAM_SERVER to build for a server other than the
+# one in vcstream.config.json.
+name: release
+
+on:
+  push:
+    tags: ["linux-v*", "macos-v*", "windows-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ${{ startsWith(github.ref_name, 'windows-') && 'windows-latest' || startsWith(github.ref_name, 'macos-') && 'macos-latest' || 'ubuntu-latest' }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      VCSTREAM_SERVER: ${{ vars.VCSTREAM_SERVER }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: plugin/package-lock.json
+
+      - name: Read the tag
+        id: tag
+        run: |
+          platform="${GITHUB_REF_NAME%%-v*}"
+          version="${GITHUB_REF_NAME#*-v}"
+          expected=$(node -p "require('./plugin/package.json').version")
+          if [ "$version" != "$expected" ]; then
+            echo "tag version $version doesn't match plugin/package.json ($expected)" >&2
+            exit 1
+          fi
+          echo "platform=$platform" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Install build tools
+        working-directory: plugin
+        run: npm ci --ignore-scripts
+
+      - name: Package
+        run: sh tools/package.sh "${{ steps.tag.outputs.platform }}"
+
+      - name: Test the installer (Linux, macOS)
+        if: steps.tag.outputs.platform != 'windows'
+        run: sh test/install-test.sh
+
+      - name: Test the installer (Windows)
+        if: steps.tag.outputs.platform == 'windows'
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File test\install-test.ps1
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/release/vcstream-* \
+            --title "VCStream ${{ steps.tag.outputs.version }} for ${{ steps.tag.outputs.platform }}" \
+            --notes "Install instructions are in INSTALL.txt inside the archive, and in the README."

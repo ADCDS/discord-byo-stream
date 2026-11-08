@@ -1,0 +1,28 @@
+# VCStream token service. It only signs LiveKit tokens, so it runs locked down with no
+# writable filesystem. Configure it in .env next to this file (see .env.example).
+name: dstream
+services:
+  tokens:
+    image: python:3.13-alpine
+    restart: unless-stopped
+    user: "${UID_GID:-1000:1000}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 64m
+    pids_limit: 64
+    command: ["python", "-u", "/app/server.py"]
+    env_file: .env
+    ports:
+      - "127.0.0.1:8091:8091"
+    volumes:
+      - ./server.py:/app/server.py:ro
+      - ./data:/data:ro
+      # To read the keys from an existing livekit.yml instead of .env, mount it here.
+      # It's a single-file mount: restart this service if that file is replaced.
+      - ${LIVEKIT_YML:-/dev/null}:/run/livekit.yml:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

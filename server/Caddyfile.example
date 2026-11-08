@@ -1,0 +1,18 @@
+# Serve the token service and the installer files from your existing site, next to
+# a LiveKit proxied at /livekit. Put these routes before the site's catch-all.
+example.com {
+	route /dstream/dl/* {
+		uri strip_prefix /dstream/dl
+		root * /opt/discord-stream/public
+		header Cache-Control no-cache
+		file_server
+	}
+	route /dstream/* {
+		uri strip_prefix /dstream
+		reverse_proxy localhost:8091
+	}
+	route /livekit* {
+		uri strip_prefix /livekit
+		reverse_proxy localhost:7880
+	}
+}
