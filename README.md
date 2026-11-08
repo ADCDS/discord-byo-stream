@@ -262,3 +262,7 @@ one-line installs. Update the download links in both READMEs when the version ch
   Discord update may change them.
 - Streams carry an extra 720p layer so new viewers start quickly, which costs the
   streamer's computer a second video encoder.
+
+## License
+
+[MIT](LICENSE). Discord is a trademark of Discord Inc.; this project isn't affiliated with it.

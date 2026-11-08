@@ -24,6 +24,7 @@ for file in $files; do
   cp "$built/$file" "$stage/"
   cp "$built/$file" "$out/"
 done
+cp "$root/LICENSE" "$stage/LICENSE.txt"
 
 case "$platform" in
   windows)

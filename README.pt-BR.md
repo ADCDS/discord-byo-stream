@@ -234,3 +234,7 @@ acima, que só você pode ler. As regras de som ficam em `installer/audio-source
 (macOS e Windows) e `installer/linux-audio.js` (PipeWire).
 
 Desenvolvimento, versões e limitações conhecidas estão no [README em inglês](README.md#development).
+
+## Licença
+
+[MIT](LICENSE). Discord é uma marca da Discord Inc.; este projeto não tem ligação com ela.
