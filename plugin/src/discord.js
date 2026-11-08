@@ -160,8 +160,9 @@ export async function capture(options) {
 }
 
 // macOS holds the request while its "record audio" prompt waits for a click, and
-// nobody may be there to answer it.
-const SYSTEM_AUDIO_TIMEOUT_MS = 15_000;
+// nobody may be there to answer it. Chromium itself waits up to 59 s, and giving up
+// earlier can leave CoreAudio stuck until Discord restarts, so wait a bit longer.
+const SYSTEM_AUDIO_TIMEOUT_MS = 65_000;
 
 /**
  * macOS and Windows: system audio without this app's own sound, through the installer's
@@ -188,21 +189,16 @@ async function captureWithSystemAudio({ sourceId, width, height, fps }) {
     const stream = await Promise.race([request, timeout]);
     const video = stream.getVideoTracks()[0];
     const audio = stream.getAudioTracks()[0] ?? null;
-    if (!audio) {
-      const reason = String(sourceId).startsWith("screen:")
-        ? "a whole-screen share can't leave Discord's voice out here, so it has no audio"
-        : "no audio for this source";
-      return { video, audio: null, audioError: reason };
-    }
-    // Only per-app capture leaves Discord's own sound out; anything else would echo the
-    // call. The installer's hook says what it granted, since Chromium reports these ids hashed.
-    const granted = String(window.__vcstreamGrantedAudio ?? "");
-    if (!granted.startsWith("applicationLoopback:")) {
+    // The installer's hook says what it granted and why, since Chromium reports per-app
+    // device ids hashed: { device, reason, app }.
+    const granted = window.__vcstreamGrantedAudio ?? {};
+    if (!audio) return { video, audio: null, audioError: granted.reason ?? "no audio for this source" };
+    // Only per-app capture leaves Discord's own sound out; anything else would echo the call.
+    if (!String(granted.device ?? "").startsWith("applicationLoopback:")) {
       audio.stop();
-      return { video, audio: null, audioError: `system audio would include the voice call (granted "${granted}")` };
+      return { video, audio: null, audioError: `system audio would include the voice call (granted "${granted.device}")` };
     }
-    const app = granted.split(":")[1];
-    return { video, audio, audioError: null, audioApps: [/^\d+$/.test(app) ? `process ${app}` : app] };
+    return { video, audio, audioError: null, audioApps: [granted.app ?? granted.device.split(":")[1]] };
   } finally {
     clearTimeout(timer);
     window.__vcstreamDisplayRequest = null;

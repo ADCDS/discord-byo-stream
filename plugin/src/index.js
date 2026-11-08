@@ -42,6 +42,18 @@ function getCurrentUserPremium() {
   return getStore("UserStore")?.getCurrentUser?.()?.premiumType ?? 0;
 }
 
+/** A short Discord-style notice at the top of the window. */
+function notify(text, ms = 9000) {
+  const box = el("div", {
+    textContent: text,
+    style: "position:fixed;top:48px;left:50%;transform:translateX(-50%);z-index:10001;max-width:min(560px,90vw);" +
+      "background:#2b2d31;color:#dbdee1;border:1px solid #3f4147;border-left:4px solid #f0b232;border-radius:8px;" +
+      "padding:10px 14px;font:14px/1.4 \"gg sans\",system-ui,sans-serif;box-shadow:0 8px 24px #0008",
+  });
+  document.body.append(box);
+  setTimeout(() => box.remove(), ms);
+}
+
 function el(tag, props = {}, ...children) {
   const node = Object.assign(document.createElement(tag), props);
   node.append(...children.filter((c) => c != null));
@@ -173,6 +185,7 @@ class VCStream {
     }
     const captured = await capture({ sourceId: id, sourceName: name, width, height, fps: frameRate, wantAudio: sound });
     if (captured.audioError) this.log(`audio capture failed: ${captured.audioError}`);
+    if (sound && !captured.audio) notify(`Streaming without sound: ${captured.audioError}`);
     await session.startShare({ ...captured, preset: { maxBitrate, fps: frameRate }, label: `${height}p${frameRate}`, mode });
   }
 

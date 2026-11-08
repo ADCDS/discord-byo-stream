@@ -62,22 +62,27 @@ function patchHeaders() {
 const SYSTEM_AUDIO = process.platform === "darwin" || process.platform === "win32";
 const handledSessions = new WeakSet();
 
-// Chromium's "without Chrome" loopback only leaves out its own audio service process.
-// Discord's voice engine plays from the renderer, so the call would leak into the
-// stream (verified on macOS; on Windows it excludes the same process). Instead, record
-// only the app that owns the shared window. A whole screen gets no audio: neither
-// platform offers "everything except this app" to Chromium.
+// Which app's audio a stream may carry is decided in audio-source.js. These are the
+// OS lookups it needs.
 
-// macOS: owner of a CGWindowID as "<bundle id> <pid>".
-const MAC_WINDOW_OWNER = `
+// macOS (JXA): "window <CGWindowID>" -> "<bundle id> <pid>" of the window's owner;
+// "bundle <id>" -> main pids of running apps with that bundle id.
+const MAC_LOOKUP = `
 ObjC.import("CoreGraphics");
 ObjC.import("AppKit");
 function run(argv) {
-  const info = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo(8, Number(argv[0]))));
+  if (argv[0] === "bundle") {
+    const apps = $.NSRunningApplication.runningApplicationsWithBundleIdentifier(argv[1]);
+    const pids = [];
+    for (let i = 0; i < apps.count; i++) pids.push(apps.objectAtIndex(i).processIdentifier);
+    return pids.join(" ");
+  }
+  const info = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo(8, Number(argv[1]))));
   const pid = info && info[0] && info[0].kCGWindowOwnerPID;
   if (!pid) return "";
   const app = $.NSRunningApplication.runningApplicationWithProcessIdentifier(pid);
-  return app.isNil() ? "" : ObjC.unwrap(app.bundleIdentifier) + " " + pid;
+  const bundle = app.isNil() || app.bundleIdentifier.isNil() ? "" : ObjC.unwrap(app.bundleIdentifier);
+  return bundle + " " + pid;
 }`;
 
 // Windows: process id owning a window handle.
@@ -88,34 +93,53 @@ $owner = 0
 [void][VCStream.User32]::GetWindowThreadProcessId([System.IntPtr][long]$args[0], [ref]$owner)
 $owner`;
 
-// macOS apps whose sound comes from a shared system process instead of their own.
-const AUDIO_PROCESS_OF = { "com.apple.Safari": "com.apple.WebKit.GPU" };
-
 function run(file, args) {
   return new Promise((resolve) => {
     execFile(file, args, { timeout: 8000, windowsHide: true }, (error, stdout) => resolve(error ? "" : stdout.trim()));
   });
 }
 
-/** Chromium's device id for the shared app's audio, or null if there's no safe choice. */
-async function appAudioDevice(sourceId) {
-  const windowId = sourceId.match(/^window:(\d+):/)?.[1];
-  if (!windowId) return null;
+const macLookup = (...args) => run("/usr/bin/osascript", ["-l", "JavaScript", "-e", MAC_LOOKUP, ...args]);
+
+async function windowOwner(windowId) {
   if (process.platform === "darwin") {
-    const [bundle, pid] = (await run("/usr/bin/osascript", ["-l", "JavaScript", "-e", MAC_WINDOW_OWNER, windowId])).split(" ");
-    if (!bundle) return null;
-    const shared = AUDIO_PROCESS_OF[bundle];
-    return shared ? `applicationLoopback:${shared}` : `applicationLoopback:${bundle}:${pid}`;
+    const [bundle, pid] = (await macLookup("window", windowId)).split(" ");
+    return pid ? { bundle: bundle || undefined, pid: Number(pid) } : null;
   }
-  if (process.platform === "win32") {
-    // Captures this process and its children, e.g. a browser and its audio process.
-    const powershell = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-    // -EncodedCommand (UTF-16LE base64) sidesteps Windows command-line quoting entirely.
-    const command = Buffer.from(`& {${WINDOWS_WINDOW_OWNER}} ${windowId}`, "utf16le").toString("base64");
-    const pid = await run(powershell, ["-NoProfile", "-NonInteractive", "-EncodedCommand", command]);
-    return /^[1-9]\d*$/.test(pid) ? `applicationLoopback:${pid}` : null;
-  }
-  return null;
+  const powershell = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  // -EncodedCommand (UTF-16LE base64) sidesteps Windows command-line quoting entirely.
+  const command = Buffer.from(`& {${WINDOWS_WINDOW_OWNER}} ${windowId}`, "utf16le").toString("base64");
+  const pid = await run(powershell, ["-NoProfile", "-NonInteractive", "-EncodedCommand", command]);
+  return /^[1-9]\d*$/.test(pid) ? { pid: Number(pid) } : null;
+}
+
+async function pidsOfBundle(bundle) {
+  return (await macLookup("bundle", bundle)).split(" ").filter(Boolean).map(Number);
+}
+
+let ownBundle;
+async function ownBundleId() {
+  if (process.platform !== "darwin") return "";
+  ownBundle ??= await bundleOfPid(process.pid);
+  return ownBundle;
+}
+
+async function bundleOfPid(pid) {
+  const script = `ObjC.import("AppKit"); function run(argv) { const a = $.NSRunningApplication.runningApplicationWithProcessIdentifier(Number(argv[0])); return a.isNil() || a.bundleIdentifier.isNil() ? "" : ObjC.unwrap(a.bundleIdentifier); }`;
+  return run("/usr/bin/osascript", ["-l", "JavaScript", "-e", script, String(pid)]);
+}
+
+async function audioForSource(sourceId) {
+  const { chooseAudioDevice } = require(path.join(HOME, "audio-source.js"));
+  return chooseAudioDevice({
+    platform: process.platform,
+    osVersion: process.getSystemVersion(),
+    ownPid: process.pid,
+    ownBundle: await ownBundleId(),
+    sourceId,
+    windowOwner,
+    pidsOfBundle,
+  });
 }
 
 /**
@@ -139,10 +163,11 @@ function handleDisplayMedia(target) {
           log(`display media: source ${wanted.sourceId} not found`);
           return callback(null);
         }
-        const audio = wanted.audio && request.audioRequested ? await appAudioDevice(video.id) : null;
+        const choice = wanted.audio && request.audioRequested ? await audioForSource(video.id) : { device: null, reason: null };
+        if (wanted.audio) log(`stream audio: ${choice.device ?? `none (${choice.reason})`}`);
         // The page can't verify this itself: Chromium reports per-app device ids hashed.
-        await frame.executeJavaScript(`window.__vcstreamGrantedAudio = ${JSON.stringify(audio)};`);
-        callback(audio ? { video, audio } : { video });
+        await frame.executeJavaScript(`window.__vcstreamGrantedAudio = ${JSON.stringify(choice)};`);
+        callback(choice.device ? { video, audio: choice.device } : { video });
       })
       .catch((error) => {
         log(`display media failed: ${error.message}`);

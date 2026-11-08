@@ -11,7 +11,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $BaseUrl = '__VCSTREAM_SERVER__/dstream/dl'
-$PayloadFiles = 'main.js', 'plugin.js', 'app-index.js'
+$PayloadFiles = 'main.js', 'plugin.js', 'app-index.js', 'audio-source.js'
 $DataDir = Join-Path $env:APPDATA 'VCStream'
 $Channels = @(
   @{ Folder = 'Discord'; Exe = 'Discord' },

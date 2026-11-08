@@ -48,6 +48,9 @@ jobs:
       - name: Package
         run: sh tools/package.sh "${{ steps.tag.outputs.platform }}"
 
+      - name: Test the audio source rules
+        run: node test/audio-source-test.mjs
+
       - name: Test the installer (Linux, macOS)
         if: steps.tag.outputs.platform != 'windows'
         run: sh test/install-test.sh

@@ -37,14 +37,26 @@ diagnostics report.
 
 | | Install | Stream audio |
 |---|---|---|
-| Windows | `install.ps1` | The shared window's app (process and children). Whole-screen shares have no audio. |
-| macOS 13+ | `install.sh` | The shared window's app. Safari is captured through WebKit's shared audio process, which may include other WebKit apps. Whole-screen shares have no audio. |
+| Windows 10 2004+ | `install.ps1` | The shared window's app: the process that owns it, and its children. |
+| macOS 14.2+ | `install.sh` | The shared window's app, chosen with Chromium's own rules (see below). |
+| macOS 13 to 14.1 | `install.sh` | None. These versions can't capture one app's audio, and the alternative includes the call. |
 | Linux, official Discord | `install.sh` | Through PipeWire: the shared window's app if its title names it, otherwise every app except Discord. |
 | Linux, Flatpak Discord | `tools/run-in-flatpak-discord.mjs` | As above. |
 
 Discord's own sound, meaning the voice call and streams you watch, is never captured,
-so nobody hears themselves. Where that can't be guaranteed, VCStream streams without
-audio rather than risk an echo.
+so nobody hears themselves. Whole-screen shares on macOS and Windows, and shares of a
+Discord window, have no audio, because there's no way there to leave Discord's voice
+out. If a stream asked for sound and can't have it, a notice in Discord says why.
+
+On macOS the audio app is picked the way Chromium picks it for its own screen
+sharing (`installer/audio-source.js`):
+
+- Chrome, Chromium, Edge and Opera: that browser instance. Their installed web apps
+  map to the browser that installed them.
+- Safari, Safari Technology Preview and Safari web apps: WebKit's shared audio
+  process, which can also carry sound from other apps that use WebKit.
+- Any other app: everything under its bundle id, which includes its helper processes.
+- Apps without a bundle id, such as many Wine and CrossOver games: no audio.
 
 ## Installing
 
@@ -103,6 +115,7 @@ The debug port lets any local program control Discord while it's open.
 
 ```sh
 cd plugin && npm ci --ignore-scripts && node build.mjs   # writes dist/public
+node test/audio-source-test.mjs                          # which audio a shared window gets
 sh test/install-test.sh                                  # installer, fake macOS home
 powershell -File test\install-test.ps1                   # installer, on Windows
 BLOCKS=30 MODE=smooth node test/e2e.mjs                  # two Chrome clients via your server
@@ -132,7 +145,15 @@ directory (`~/Library/Application Support` on macOS, `%APPDATA%` on Windows,
 
 ## Known limits
 
+- A Discord update replaces `app.asar` and silently removes the hook, so run the
+  installer again after one.
 - LIVE badges only appear for people in the same voice channel with VCStream running.
 - No stream preview thumbnails, and no camera.
+- The first stream on macOS asks for Screen Recording permission, and Discord may need
+  a restart after granting it. The first stream with sound asks to record audio.
+- On macOS 14 and earlier, Discord turns off ScreenCaptureKit, so window capture uses
+  Chromium's older capturer, which can be slower.
+- Per-app audio uses Chromium device ids Electron doesn't document. A future
+  Electron may change them.
 - Streams start at a lower resolution and step up within seconds. They also carry a
   720p layer so new viewers start quickly, which costs the streamer a second encoder.

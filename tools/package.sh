@@ -17,7 +17,7 @@ out="$root/dist/release"
 stage="$out/$name"
 rm -rf "$stage"
 mkdir -p "$stage"
-for file in "$installer" main.js plugin.js app-index.js linux-audio.js; do
+for file in "$installer" main.js plugin.js app-index.js audio-source.js linux-audio.js; do
   cp "$root/dist/public/$file" "$stage/"
 done
 

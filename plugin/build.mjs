@@ -34,7 +34,7 @@ await build({
     __VERSION__: JSON.stringify(version),
   },
 });
-for (const file of ["main.js", "app-index.js", "linux-audio.js", "install.sh", "install.ps1"]) {
+for (const file of ["main.js", "app-index.js", "audio-source.js", "linux-audio.js", "install.sh", "install.ps1"]) {
   const text = readFileSync(join(installer, file), "utf8").replaceAll("__VCSTREAM_SERVER__", server);
   writeFileSync(join(outDir, file), text);
 }
