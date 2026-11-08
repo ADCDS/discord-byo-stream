@@ -62,7 +62,8 @@ jobs:
         run: |
           platform="${{ steps.tag.outputs.platform }}"
           version="${{ steps.tag.outputs.version }}"
-          title=$(case "$platform" in linux) echo Linux ;; macos) echo macOS ;; windows) echo Windows ;; esac)
+          # Not inside $(...): macOS's bash 3.2 can't parse a case statement there.
+          case "$platform" in linux) title=Linux ;; macos) title=macOS ;; *) title=Windows ;; esac
           sh tools/release-notes.sh "$platform" "$version" "$GITHUB_REPOSITORY" > notes.md
           gh release create "$GITHUB_REF_NAME" dist/release/"$platform"/* \
             --title "BYO Stream $version for $title" --notes-file notes.md
