@@ -1,7 +1,9 @@
-# VCStream token service. It only signs LiveKit tokens, so it runs locked down with no
-# writable filesystem. Configure it in .env next to this file (see .env.example).
+# BYO Stream's server: the token service, and optionally LiveKit itself.
+# Configure it in .env next to this file (see .env.example), then: docker compose up -d
 name: dstream
 services:
+  # Swaps access keys for LiveKit tokens. It only signs tokens, so it runs locked down
+  # with no writable filesystem.
   tokens:
     image: python:3.13-alpine
     restart: unless-stopped
@@ -18,9 +20,25 @@ services:
     volumes:
       - ./server.py:/app/server.py:ro
       - ./data:/data:ro
-      # To read the keys from an existing livekit.yml instead of .env, mount it here.
-      # It's a single-file mount: restart this service if that file is replaced.
+      # The LiveKit keys can come from a livekit.yml instead of .env. It's a
+      # single-file mount: restart this service if that file is replaced.
       - ${LIVEKIT_YML:-/dev/null}:/run/livekit.yml:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  # LiveKit, for servers that don't run one yet. Started when .env has
+  # COMPOSE_PROFILES=livekit. Host networking, because media uses a wide UDP range.
+  livekit:
+    profiles: [livekit]
+    image: livekit/livekit-server:v1.13.10
+    restart: unless-stopped
+    network_mode: host
+    command: ["--config", "/etc/livekit.yml"]
+    volumes:
+      - ./livekit.yml:/etc/livekit.yml:ro
     logging:
       driver: json-file
       options:

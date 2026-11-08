@@ -1,0 +1,14 @@
+# LiveKit's settings, for the livekit service in compose.yml. Copy to livekit.yml.
+# The port numbers here must match your firewall and Caddyfile.
+port: 7880 # signalling; Caddy proxies it as wss://<your domain>/livekit
+rtc:
+  tcp_port: 7881 # media over TCP, for networks that block UDP
+  port_range_start: 50000 # media over UDP
+  port_range_end: 60000
+  use_external_ip: true # find this server's public IP
+keys:
+  # One line, "<api key>: <api secret>". Make your own with:
+  #   echo "API$(openssl rand -hex 6): $(openssl rand -hex 32)"
+  REPLACE_WITH_API_KEY: REPLACE_WITH_API_SECRET_AT_LEAST_32_CHARACTERS
+logging:
+  level: info

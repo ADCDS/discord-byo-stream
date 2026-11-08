@@ -1,4 +1,4 @@
-// VCStream's main-process hook, loaded from Discord's app folder before Discord's
+// BYO Stream's main-process hook, loaded from Discord's app folder before Discord's
 // own code. It does two things: lets the page reach our server, and runs the
 // plugin in Discord's main window. Failures are logged and never stop Discord.
 const { app, desktopCapturer, session } = require("electron");
@@ -6,11 +6,7 @@ const { execFile } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const HOME = path.join(app.getPath("appData"), "VCStream");
-// Filled in by the build from vcstream.config.json. LiveKit must be served from the
-// same host (VCStream's server proxies it at /livekit).
-const SERVER_HOST = new URL("__VCSTREAM_SERVER__").host;
-const SERVER_ORIGINS = [`https://${SERVER_HOST}`, `wss://${SERVER_HOST}`];
+const HOME = path.join(app.getPath("appData"), "discord-byo-stream");
 const DISCORD_APP_URL = /^https:\/\/(ptb\.|canary\.)?discord\.com\/(?!popout|overlay)/;
 
 function log(message) {
@@ -20,6 +16,23 @@ function log(message) {
     // Logging must never be the thing that breaks Discord.
   }
 }
+
+/** The installer's config.json: { accessKey, server }. */
+function readConfig() {
+  try {
+    const config = JSON.parse(fs.readFileSync(path.join(HOME, "config.json"), "utf8"));
+    if (typeof config.accessKey === "string" && /^https:\/\/[^/]+$/.test(config.server ?? "")) return config;
+    log("config.json has no access key or server; run the installer again");
+  } catch (error) {
+    log(`config.json unreadable: ${error.message}`);
+  }
+  return null;
+}
+
+const CONFIG = readConfig();
+// LiveKit must be served from the same host as the token server (at /livekit).
+const SERVER_HOST = CONFIG ? new URL(CONFIG.server).host : null;
+const SERVER_ORIGINS = SERVER_HOST ? [`https://${SERVER_HOST}`, `wss://${SERVER_HOST}`] : [];
 
 /** Adds our server to connect-src, leaving the rest of Discord's policy intact. */
 function allowServer(headers) {
@@ -88,9 +101,9 @@ function run(argv) {
 // Windows: process id owning a window handle.
 const WINDOWS_WINDOW_OWNER = `
 $ErrorActionPreference = "Stop"
-Add-Type -Namespace VCStream -Name User32 -MemberDefinition '[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(System.IntPtr hWnd, out uint pid);'
+Add-Type -Namespace ByoStream -Name User32 -MemberDefinition '[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(System.IntPtr hWnd, out uint pid);'
 $owner = 0
-[void][VCStream.User32]::GetWindowThreadProcessId([System.IntPtr][long]$args[0], [ref]$owner)
+[void][ByoStream.User32]::GetWindowThreadProcessId([System.IntPtr][long]$args[0], [ref]$owner)
 $owner`;
 
 function run(file, args) {
@@ -144,7 +157,7 @@ async function audioForSource(sourceId) {
 
 /**
  * Discord sets no display-media handler, so getDisplayMedia is the plugin's own. The
- * plugin names the source it wants on window.__vcstreamDisplayRequest, already picked
+ * plugin names the source it wants on window.__byoStreamDisplayRequest, already picked
  * in Discord's window. The audio device is chosen so Discord's own sound can't be in it.
  */
 function handleDisplayMedia(target) {
@@ -154,7 +167,7 @@ function handleDisplayMedia(target) {
     const frame = request.frame;
     if (!frame) return callback(null);
     frame
-      .executeJavaScript("window.__vcstreamDisplayRequest ?? null")
+      .executeJavaScript("window.__byoStreamDisplayRequest ?? null")
       .then(async (wanted) => {
         if (!wanted?.sourceId) return callback(null);
         const sources = await desktopCapturer.getSources({ types: ["screen", "window"], thumbnailSize: { width: 0, height: 0 } });
@@ -166,7 +179,7 @@ function handleDisplayMedia(target) {
         const choice = wanted.audio && request.audioRequested ? await audioForSource(video.id) : { device: null, reason: null };
         if (wanted.audio) log(`stream audio: ${choice.device ?? `none (${choice.reason})`}`);
         // The page can't verify this itself: Chromium reports per-app device ids hashed.
-        await frame.executeJavaScript(`window.__vcstreamGrantedAudio = ${JSON.stringify(choice)};`);
+        await frame.executeJavaScript(`window.__byoStreamGrantedAudio = ${JSON.stringify(choice)};`);
         callback(choice.device ? { video, audio: choice.device } : { video });
       })
       .catch((error) => {
@@ -177,13 +190,14 @@ function handleDisplayMedia(target) {
 }
 
 function pluginSource() {
-  const { accessKey } = JSON.parse(fs.readFileSync(path.join(HOME, "config.json"), "utf8"));
   const code = fs.readFileSync(path.join(HOME, "plugin.js"), "utf8");
-  const flags = `window.__vcstreamSystemAudio = ${SYSTEM_AUDIO};\nwindow.__vcstreamConsoleHost = ${Boolean(linuxAudio)};`;
-  return `${flags}\n(function (VCSTREAM_ACCESS_KEY) {\n${code}\n})(${JSON.stringify(accessKey)});`;
+  const flags = `window.__byoStreamSystemAudio = ${SYSTEM_AUDIO};\nwindow.__byoStreamConsoleHost = ${Boolean(linuxAudio)};`;
+  const args = [CONFIG.accessKey, CONFIG.server].map((value) => JSON.stringify(value)).join(", ");
+  return `${flags}\n(function (BYO_ACCESS_KEY, BYO_SERVER) {\n${code}\n})(${args});`;
 }
 
 app.whenReady().then(() => {
+  if (!CONFIG) return;
   try {
     patchHeaders();
     log(`hooked, Discord ${app.getVersion()} Electron ${process.versions.electron}`);
@@ -211,7 +225,9 @@ function writePluginLog(line) {
 
 // Linux: per-app stream audio through PipeWire (see linux-audio.js). The plugin asks
 // for it with console messages, since the page has no other channel to this process.
-const HOST_PREFIX = "[VCStream-host] ";
+// The plugin logs with console.log("[BYO Stream]", message).
+const LOG_PREFIX = "[BYO Stream] ";
+const HOST_PREFIX = "[BYO-Stream-host] ";
 let linuxAudio = null;
 if (process.platform === "linux") {
   try {
@@ -235,7 +251,7 @@ async function answerHost(contents, json) {
     result = { ok: false, error: error.message };
   }
   if (request?.id == null || contents.isDestroyed()) return;
-  const reply = `window.__vcstreamHostReply?.(${JSON.stringify(request.id)}, ${JSON.stringify(JSON.stringify(result))})`;
+  const reply = `window.__byoStreamHostReply?.(${JSON.stringify(request.id)}, ${JSON.stringify(JSON.stringify(result))})`;
   contents.executeJavaScript(reply).catch(() => {});
 }
 
@@ -244,19 +260,20 @@ function watchPlugin(contents) {
   contents.on("console-message", (...args) => {
     const message = typeof args[0]?.message === "string" ? args[0].message : args[2];
     if (typeof message !== "string") return;
-    if (message.startsWith("[VCStream]")) writePluginLog(message.slice(11));
+    if (message.startsWith(LOG_PREFIX)) writePluginLog(message.slice(LOG_PREFIX.length));
     else if (linuxAudio && message.startsWith(HOST_PREFIX)) answerHost(contents, message.slice(HOST_PREFIX.length));
   });
   const timer = setInterval(() => {
     if (contents.isDestroyed()) return clearInterval(timer);
     contents
-      .executeJavaScript("window.__vcstream?.report ? window.__vcstream.report().then((r) => JSON.stringify(r, null, 1)) : null")
+      .executeJavaScript("window.__byoStream?.report ? window.__byoStream.report().then((r) => JSON.stringify(r, null, 1)) : null")
       .then((report) => report && fs.writeFileSync(STATUS_FILE, report))
       .catch(() => {});
   }, 15_000);
 }
 
 app.on("web-contents-created", (_event, contents) => {
+  if (!CONFIG) return;
   let watched = false;
   contents.on("dom-ready", () => {
     if (!watched && contents.getType() === "window" && DISCORD_APP_URL.test(contents.getURL())) {

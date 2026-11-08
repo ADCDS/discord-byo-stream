@@ -3,7 +3,7 @@
 //
 // Chromium's "without Chrome" loopback only leaves out its own audio service process,
 // but Discord's voice engine plays from the renderer, so the call would leak into the
-// stream. So VCStream records only the app that owns the shared window, using
+// stream. So BYO Stream records only the app that owns the shared window, using
 // Chromium's per-application loopback device ids. Whole screens get no audio: neither
 // macOS nor Windows offers Chromium "everything except this app".
 

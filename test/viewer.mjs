@@ -15,6 +15,7 @@ if (!/^\d{15,25}$/.test(channel ?? "")) {
 const here = dirname(fileURLToPath(import.meta.url));
 const code = readFileSync(join(here, "../dist/public/plugin.js"), "utf8");
 const accessKey = readFileSync(join(here, "../.keys/e2e.key"), "utf8").trim();
+const server = (process.env.BYO_SERVER || JSON.parse(readFileSync(join(here, "../byo-stream.config.json"), "utf8")).server).replace(/\/+$/, "");
 
 const browser = await chromium.launch({
   executablePath: "/usr/bin/google-chrome",
@@ -38,11 +39,11 @@ await page.addInitScript((id) => {
   });
 }, channel);
 await page.goto("https://discord.com/channels/test");
-await page.evaluate(({ source, key }) => new Function("VCSTREAM_ACCESS_KEY", source)(key), { source: code, key: accessKey });
+await page.evaluate(({ source, key, server }) => new Function("BYO_ACCESS_KEY", "BYO_SERVER", source)(key, server), { source: code, key: accessKey, server });
 
 // Coarse 8x8 brightness signature: enough to tell frames apart, useless as an image.
 const signature = () => page.evaluate(() => {
-  const video = document.querySelector("#vcstream video");
+  const video = document.querySelector("#byo-stream video");
   if (!video?.videoWidth) return null;
   const canvas = Object.assign(document.createElement("canvas"), { width: 8, height: 8 });
   const g = canvas.getContext("2d");
@@ -59,20 +60,20 @@ let distinctFrames = new Set();
 while (Date.now() < deadline) {
   await page.waitForTimeout(3000);
   if (!watching) {
-    const watch = page.locator("#vcstream button", { hasText: "Watch" });
+    const watch = page.locator("#byo-stream button", { hasText: "Watch" });
     if (await watch.count()) {
-      console.log("stream found:", await page.locator("#vcstream .row .grow").first().textContent());
+      console.log("stream found:", await page.locator("#byo-stream .row .grow").first().textContent());
       await watch.first().click();
       watching = true;
     } else {
-      console.log("waiting for a stream:", await page.locator("#vcstream header span").textContent());
+      console.log("waiting for a stream:", await page.locator("#byo-stream header span").textContent());
       continue;
     }
   }
   const frame = await signature();
   if (frame !== null) distinctFrames.add(frame);
   const audio = await page.evaluate(async () => {
-    const stream = window.__vcstream.audioEl?.srcObject;
+    const stream = window.__byoStream.audioEl?.srcObject;
     if (!stream?.getAudioTracks().length) return "none";
     // Peak level over half a second, to tell real sound from silence.
     const ctx = new AudioContext();
@@ -88,10 +89,10 @@ while (Date.now() < deadline) {
     ctx.close();
     return `peak ${peak.toFixed(3)}`;
   });
-  console.log(`${await page.locator("#vcstream .stats").textContent()} | audio ${audio} distinctFrames=${distinctFrames.size}`);
+  console.log(`${await page.locator("#byo-stream .stats").textContent()} | audio ${audio} distinctFrames=${distinctFrames.size}`);
 }
 // SNAPSHOT=path saves one frame as the viewer sees it, only when asked.
 if (process.env.SNAPSHOT && watching) {
-  await page.locator("#vcstream video").screenshot({ path: process.env.SNAPSHOT }).catch((error) => console.log(`snapshot failed: ${error.message}`));
+  await page.locator("#byo-stream video").screenshot({ path: process.env.SNAPSHOT }).catch((error) => console.log(`snapshot failed: ${error.message}`));
 }
 await browser.close();

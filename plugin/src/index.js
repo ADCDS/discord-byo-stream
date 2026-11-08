@@ -4,7 +4,7 @@ import { NativeBridge } from "./native.js";
 import { MODES, QUALITY, Session } from "./session.js";
 import { publisherStats, viewerStats } from "./stats.js";
 
-const API_URL = __API_URL__;
+const API_URL = `${__SERVER__}/dstream`;
 const ACCESS_KEY = __ACCESS_KEY__;
 const VERSION = __VERSION__;
 const POLL_MS = 1500;
@@ -15,27 +15,27 @@ const NATIVE_GRACE_MS = 45_000;
 const DEBUG_SHORTCUT = (event) => event.ctrlKey && event.altKey && event.code === "KeyV";
 
 const CSS = `
-#vcstream{position:fixed;right:16px;bottom:16px;width:320px;z-index:10000;background:#1e1f22;color:#dbdee1;
+#byo-stream{position:fixed;right:16px;bottom:16px;width:320px;z-index:10000;background:#1e1f22;color:#dbdee1;
   border:1px solid #3f4147;border-radius:8px;font:13px/1.4 "gg sans",system-ui,sans-serif;box-shadow:0 8px 24px #0008}
-#vcstream.wide{width:min(960px,calc(100vw - 32px))}
-#vcstream header{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:move;user-select:none;font-weight:600}
-#vcstream header span{flex:1;font-weight:400;color:#b5bac1;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#vcstream .body{padding:0 10px 10px;display:flex;flex-direction:column;gap:8px}
-#vcstream button{background:#4e5058;color:#fff;border:0;border-radius:4px;padding:5px 10px;font:inherit;cursor:pointer}
-#vcstream button:hover{background:#6d6f78}
-#vcstream button.primary{background:#5865f2}
-#vcstream button.primary:hover{background:#4752c4}
-#vcstream button.danger{background:#da373c}
-#vcstream select{background:#2b2d31;color:#dbdee1;border:1px solid #3f4147;border-radius:4px;padding:4px;font:inherit}
-#vcstream .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-#vcstream .row .grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#vcstream .error{color:#fa777c;overflow-wrap:anywhere}
-#vcstream .stats{font:11px/1.4 ui-monospace,monospace;color:#949ba4;overflow-wrap:anywhere}
-#vcstream video{width:100%;background:#000;border-radius:4px;display:block;max-height:70vh}
-#vcstream .sources{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;max-height:280px;overflow:auto}
-#vcstream .source{background:#2b2d31;padding:4px;text-align:left;overflow:hidden}
-#vcstream .source img{width:100%;display:block;border-radius:2px;background:#000;aspect-ratio:16/9;object-fit:contain}
-#vcstream .source div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;margin-top:2px}
+#byo-stream.wide{width:min(960px,calc(100vw - 32px))}
+#byo-stream header{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:move;user-select:none;font-weight:600}
+#byo-stream header span{flex:1;font-weight:400;color:#b5bac1;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#byo-stream .body{padding:0 10px 10px;display:flex;flex-direction:column;gap:8px}
+#byo-stream button{background:#4e5058;color:#fff;border:0;border-radius:4px;padding:5px 10px;font:inherit;cursor:pointer}
+#byo-stream button:hover{background:#6d6f78}
+#byo-stream button.primary{background:#5865f2}
+#byo-stream button.primary:hover{background:#4752c4}
+#byo-stream button.danger{background:#da373c}
+#byo-stream select{background:#2b2d31;color:#dbdee1;border:1px solid #3f4147;border-radius:4px;padding:4px;font:inherit}
+#byo-stream .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#byo-stream .row .grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#byo-stream .error{color:#fa777c;overflow-wrap:anywhere}
+#byo-stream .stats{font:11px/1.4 ui-monospace,monospace;color:#949ba4;overflow-wrap:anywhere}
+#byo-stream video{width:100%;background:#000;border-radius:4px;display:block;max-height:70vh}
+#byo-stream .sources{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;max-height:280px;overflow:auto}
+#byo-stream .source{background:#2b2d31;padding:4px;text-align:left;overflow:hidden}
+#byo-stream .source img{width:100%;display:block;border-radius:2px;background:#000;aspect-ratio:16/9;object-fit:contain}
+#byo-stream .source div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;margin-top:2px}
 `;
 
 function getCurrentUserPremium() {
@@ -60,7 +60,7 @@ function el(tag, props = {}, ...children) {
   return node;
 }
 
-class VCStream {
+class ByoStream {
   start() {
     this.logs = [];
     this.session = null;
@@ -76,9 +76,9 @@ class VCStream {
     this.audioEl = null;
     this.volume = 1;
 
-    this.style = el("style", { id: "vcstream-style", textContent: CSS });
+    this.style = el("style", { id: "byo-stream-style", textContent: CSS });
     document.head.append(this.style);
-    this.root = el("div", { id: "vcstream", hidden: true });
+    this.root = el("div", { id: "byo-stream", hidden: true });
     document.body.append(this.root);
 
     this.startedAt = Date.now();
@@ -112,7 +112,7 @@ class VCStream {
   }
 
   log = (message) => {
-    console.log("[VCStream]", message);
+    console.log("[BYO Stream]", message);
     this.logs.push(`${new Date().toISOString().slice(11, 19)} ${message}`);
     if (this.logs.length > LOG_LIMIT) this.logs.shift();
   };
@@ -331,7 +331,7 @@ class VCStream {
       this.detachMedia();
       this.root.replaceChildren();
       if (this.error) {
-        this.root.append(el("header", {}, "VCStream"), el("div", { className: "body" }, el("div", { className: "error", textContent: this.error })));
+        this.root.append(el("header", {}, "BYO Stream"), el("div", { className: "body" }, el("div", { className: "error", textContent: this.error })));
       }
       return;
     }
@@ -339,7 +339,7 @@ class VCStream {
     const watching = this.native ? null : session.watches()[0];
     this.root.classList.toggle("wide", !!watching);
 
-    const header = el("header", { onmousedown: (event) => this.startDrag(event) }, "VCStream", el("span", { textContent: this.statusText() }));
+    const header = el("header", { onmousedown: (event) => this.startDrag(event) }, "BYO Stream", el("span", { textContent: this.statusText() }));
     const body = el("div", { className: "body" });
 
     if (this.error) body.append(el("div", { className: "error", textContent: this.error }));
@@ -544,6 +544,6 @@ class VCStream {
 }
 
 // Loaders can run this again on the same page to swap in a new build.
-window.__vcstream?.stop();
-window.__vcstream = new VCStream();
-window.__vcstream.start();
+window.__byoStream?.stop();
+window.__byoStream = new ByoStream();
+window.__byoStream.start();

@@ -1,9 +1,9 @@
-// Written to Discord's resources/app/index.js by the VCStream installer. Discord's
-// real app.asar is renamed to vcstream.app.asar and started from here.
+// Written to Discord's resources/app/index.js by the BYO Stream installer. Discord's
+// real app.asar is renamed to byo-stream.app.asar and started from here.
 const path = require("node:path");
 const { app } = require("electron");
 
-const realApp = path.join(__dirname, "..", "vcstream.app.asar");
+const realApp = path.join(__dirname, "..", "byo-stream.app.asar");
 
 // Electron names the app after this folder's package.json, and on macOS that name
 // picks the Keychain item holding the login. Restore the real identity so logins
@@ -15,14 +15,14 @@ try {
   if (name) app.setName(String(name).trim());
   if (require.main) require.main.filename = path.resolve(realApp, pkg.main);
 } catch (error) {
-  console.error("VCStream: restoring app identity failed:", error);
+  console.error("BYO Stream: restoring app identity failed:", error);
 }
 
-// A broken VCStream must never stop Discord from starting.
+// A broken BYO Stream must never stop Discord from starting.
 try {
-  require(path.join(app.getPath("appData"), "VCStream", "main.js"));
+  require(path.join(app.getPath("appData"), "discord-byo-stream", "main.js"));
 } catch (error) {
-  console.error("VCStream: failed to load:", error);
+  console.error("BYO Stream: failed to load:", error);
 }
 
 module.exports = require(realApp);

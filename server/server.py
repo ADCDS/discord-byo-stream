@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Issues short-lived LiveKit tokens to VCStream plugin users. Standard library only.
+"""Issues short-lived LiveKit tokens to BYO Stream plugin users. Standard library only.
 
 Access keys live in /data/keys.json as {sha256_hex_of_key: owner_name}, so raw
 keys never reach this server. The file is re-read per request: editing it adds
@@ -33,7 +33,6 @@ ALLOWED_ORIGINS = {
     "https://canary.discord.com",
 }
 CHANNEL_ID = re.compile(r"^\d{15,25}$")
-LIVEKIT_KEY = re.compile(r"^keys:\s*\n\s+(\S+?):\s*(\S+)\s*$", re.MULTILINE)
 
 
 def b64url(raw: bytes) -> str:
@@ -45,10 +44,26 @@ def load_livekit_credentials() -> tuple[str, str]:
     if key and secret:
         return key, secret
     with open(LIVEKIT_CONFIG, encoding="utf-8") as f:
-        match = LIVEKIT_KEY.search(f.read())
-    if not match:
-        raise RuntimeError("no keys: entry found in livekit config")
-    return match.group(1), match.group(2)
+        found = first_livekit_key(f.read())
+    if not found:
+        raise RuntimeError(f"no entry under keys: in {LIVEKIT_CONFIG}")
+    return found
+
+
+def first_livekit_key(text: str) -> tuple[str, str] | None:
+    """The first "<key>: <secret>" under livekit.yml's top-level keys:, skipping comments."""
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if not re.match(r"^keys:\s*(#.*)?$", line):
+            continue
+        for entry in lines[i + 1:]:
+            if not entry.strip() or entry.strip().startswith("#"):
+                continue
+            if not entry[0].isspace():
+                return None  # the next top-level setting: keys: was empty
+            match = re.match(r"""^\s+["']?([^\s:"'#]+)["']?:\s*["']?([^\s"'#]+)""", entry)
+            return (match.group(1), match.group(2)) if match else None
+    return None
 
 
 def owner_of(access_key: str) -> str | None:
@@ -131,8 +146,17 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    def key_owner(self) -> str | None:
+        auth = self.headers.get("Authorization", "")
+        return owner_of(auth[7:]) if auth.startswith("Bearer ") else None
+
     def do_GET(self):
         if self.path == "/health":
+            return self.reply(200, {"ok": True})
+        if self.path == "/check":
+            # The installers call this to catch a mistyped key before changing anything.
+            if self.key_owner() is None:
+                return self.reply(401, {"error": "invalid access key"})
             return self.reply(200, {"ok": True})
         self.reply(404, {"error": "not found"})
 
@@ -142,8 +166,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.origin_allowed():
             return self.reply(403, {"error": "origin not allowed"})
 
-        auth = self.headers.get("Authorization", "")
-        owner = owner_of(auth[7:]) if auth.startswith("Bearer ") else None
+        owner = self.key_owner()
         if owner is None:
             return self.reply(401, {"error": "invalid access key"})
 

@@ -1,0 +1,5 @@
+{
+  "server": "https://streams.example.com",
+  "sshHost": "streams.example.com",
+  "serverDir": "/home/you/discord-byo-stream/server"
+}

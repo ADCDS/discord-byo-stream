@@ -3,3 +3,6 @@ dist/
 .keys/
 server/.env
 server/data/
+# Your own server details; see byo-stream.config.example.json.
+byo-stream.config.json
+__pycache__/

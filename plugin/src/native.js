@@ -6,9 +6,9 @@
 // servers would normally send back are dispatched locally instead.
 import { findExport, getStore } from "./discord.js";
 
-const STREAM_ID_PREFIX = "vcstream:";
+const STREAM_ID_PREFIX = "byo-stream:";
 const VIDEO_GUARD_EXPERIMENT = "2026-08-video-guard";
-const REGION = "vcstream";
+const REGION = "byo-stream";
 const STREAM_CONTEXT = "stream";
 const GATEWAY_STREAM_METHODS = ["streamCreate", "streamWatch", "streamDelete", "streamSetPaused", "streamPing"];
 const REASON_USER_REQUESTED = "user_requested";
@@ -341,9 +341,9 @@ export class NativeBridge {
       return;
     }
     const identity = this.liveUsers.get(ownerId);
-    this.log(`watch requested for ${ownerId}${identity ? "" : " (not live on VCStream)"}`);
+    this.log(`watch requested for ${ownerId}${identity ? "" : " (not live on BYO Stream)"}`);
     if (!identity) {
-      this.log(`watch: ${ownerId} isn't live on VCStream`);
+      this.log(`watch: ${ownerId} isn't live on BYO Stream`);
       this.dispatch({ type: "STREAM_DELETE", streamKey, unavailable: false, reason: REASON_UNAUTHORIZED });
       return;
     }
@@ -552,7 +552,7 @@ export class NativeBridge {
       }
     }
 
-    return function VCStreamVideo(props) {
+    return function ByoStreamVideo(props) {
       if (String(props.streamId).startsWith(STREAM_ID_PREFIX)) return createElement(LiveVideo, props);
       return bridge.fallbackComponent ? createElement(bridge.fallbackComponent, props) : null;
     };

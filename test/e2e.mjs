@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const pluginCode = readFileSync(join(here, "../dist/public/plugin.js"), "utf8");
 const accessKey = readFileSync(join(here, "../.keys/e2e.key"), "utf8").trim();
+const server = (process.env.BYO_SERVER || JSON.parse(readFileSync(join(here, "../byo-stream.config.json"), "utf8")).server).replace(/\/+$/, "");
 const CHANNEL = `1${String(Date.now()).padStart(17, "0")}`;
 // BLOCKS sets how busy the fake screen is. 30 is game-like, 400 is close to incompressible.
 const BLOCKS = Number(process.env.BLOCKS ?? 30);
@@ -85,8 +86,8 @@ function stubDiscord({ channel, displayName, blocks }) {
   };
 }
 
-function loadLikeMainProcess({ code, key }) {
-  new Function("VCSTREAM_ACCESS_KEY", code)(key);
+function loadLikeMainProcess({ code, key, server }) {
+  new Function("BYO_ACCESS_KEY", "BYO_SERVER", code)(key, server);
 }
 
 const browser = await chromium.launch({
@@ -105,22 +106,22 @@ async function client(displayName) {
   page.on("pageerror", (error) => page.errors.push(error.message));
   await page.addInitScript(stubDiscord, { channel: CHANNEL, displayName, blocks: BLOCKS });
   await page.goto("https://discord.com/channels/test");
-  await page.evaluate(loadLikeMainProcess, { code: pluginCode, key: accessKey });
+  await page.evaluate(loadLikeMainProcess, { code: pluginCode, key: accessKey, server });
   return page;
 }
 
 try {
   const streamer = await client("Alice");
   const viewer = await client("Bob");
-  const button = (page, text) => page.locator("#vcstream button", { hasText: text });
+  const button = (page, text) => page.locator("#byo-stream button", { hasText: text });
 
-  await viewer.waitForFunction(() => /2 with plugin/.test(document.querySelector("#vcstream header")?.textContent ?? ""), null, { timeout: 20000 });
+  await viewer.waitForFunction(() => /2 with plugin/.test(document.querySelector("#byo-stream header")?.textContent ?? ""), null, { timeout: 20000 });
   check("both clients connected to the room", true);
 
   await button(streamer, "Share screen").click();
   await button(streamer, "Fake screen").waitFor({ timeout: 5000 });
   check("source picker lists capture sources", true);
-  await streamer.locator("#vcstream select").nth(1).selectOption(MODE);
+  await streamer.locator("#byo-stream select").nth(1).selectOption(MODE);
   await button(streamer, "Fake screen").click();
   await streamer.getByText("You're live").waitFor({ timeout: 20000 });
   check("streamer is live", true);
@@ -134,14 +135,14 @@ try {
   await viewer.getByText("Alice is live").waitFor({ timeout: 15000 });
   check("viewer sees the Discord display name", true);
   await button(viewer, "Watch").click();
-  await viewer.waitForFunction(() => document.querySelector("#vcstream video")?.videoWidth > 0, null, { timeout: 20000 });
+  await viewer.waitForFunction(() => document.querySelector("#byo-stream video")?.videoWidth > 0, null, { timeout: 20000 });
   check("viewer decodes video", true);
 
-  const first = await viewer.evaluate(() => document.querySelector("#vcstream video").currentTime);
+  const first = await viewer.evaluate(() => document.querySelector("#byo-stream video").currentTime);
   const colors = new Set();
   for (let i = 0; i < 16; i++) {
     colors.add(await viewer.evaluate(() => {
-      const v = document.querySelector("#vcstream video");
+      const v = document.querySelector("#byo-stream video");
       const c = Object.assign(document.createElement("canvas"), { width: 4, height: 4 });
       const g = c.getContext("2d");
       g.drawImage(v, 0, 0, v.videoWidth / 8, v.videoHeight / 8, 0, 0, 4, 4);
@@ -150,7 +151,7 @@ try {
     }));
     await viewer.waitForTimeout(250);
   }
-  const last = await viewer.evaluate(() => document.querySelector("#vcstream video").currentTime);
+  const last = await viewer.evaluate(() => document.querySelector("#byo-stream video").currentTime);
   check("video keeps playing", last > first + 2, `${first.toFixed(1)}s -> ${last.toFixed(1)}s`);
   check("the actual pixels arrive and change", colors.size === 2, [...colors].join(","));
 
@@ -160,8 +161,8 @@ try {
   let lastLine = "";
   while (Date.now() - startedAt < 30000) {
     await viewer.waitForTimeout(3000);
-    lastLine = await viewer.locator("#vcstream .stats").textContent();
-    const sending = await streamer.locator("#vcstream .stats").textContent();
+    lastLine = await viewer.locator("#byo-stream .stats").textContent();
+    const sending = await streamer.locator("#byo-stream .stats").textContent();
     const elapsed = Math.round((Date.now() - startedAt) / 1000);
     console.log(`      t+${String(elapsed).padStart(2)}s  ${lastLine}   <<  ${sending}`);
     if (rampSeconds === null && /watching 1280x720/.test(lastLine)) rampSeconds = elapsed;
@@ -170,7 +171,7 @@ try {
   check("ramps up to full resolution", rampSeconds !== null, `after ${rampSeconds}s`);
 
   const audioPeak = await viewer.evaluate(async () => {
-    const stream = document.querySelector("audio")?.srcObject ?? window.__vcstream.audioEl?.srcObject;
+    const stream = document.querySelector("audio")?.srcObject ?? window.__byoStream.audioEl?.srcObject;
     if (!stream) return -1;
     const ctx = new AudioContext();
     const analyser = ctx.createAnalyser();
@@ -186,8 +187,8 @@ try {
   });
   check("audio arrives with real signal", audioPeak > 0.01, `peak ${audioPeak.toFixed(3)}`);
 
-  const watchLine = await viewer.locator("#vcstream .stats").textContent();
-  const sendLine = await streamer.locator("#vcstream .stats").textContent();
+  const watchLine = await viewer.locator("#byo-stream .stats").textContent();
+  const sendLine = await streamer.locator("#byo-stream .stats").textContent();
   check("media uses UDP, not the TCP fallback", / udp$/.test(watchLine) && / udp$/.test(sendLine));
 
   await button(viewer, "Copy diagnostics").click();
@@ -201,22 +202,22 @@ try {
   await streamer.evaluate(() => { window.__frozen = true; });
   await viewer.waitForTimeout(3000);
   await button(viewer, "Watch").click();
-  const stillPicture = await viewer.waitForFunction(() => document.querySelector("#vcstream video")?.videoWidth > 0, null, { timeout: 15000 }).then(() => true, () => false);
+  const stillPicture = await viewer.waitForFunction(() => document.querySelector("#byo-stream video")?.videoWidth > 0, null, { timeout: 15000 }).then(() => true, () => false);
   check("a late viewer of a still screen gets a picture", stillPicture);
   await streamer.evaluate(() => { window.__frozen = false; });
 
   await button(streamer, "Stop").click();
   await viewer.getByText("Alice is live").waitFor({ state: "detached", timeout: 15000 });
-  check("stream ending clears it for the viewer", (await viewer.locator("#vcstream video").count()) === 0);
+  check("stream ending clears it for the viewer", (await viewer.locator("#byo-stream video").count()) === 0);
   await button(streamer, "Share screen").waitFor({ timeout: 5000 });
   check("streamer can share again after stopping", true);
 
   await viewer.evaluate(() => { window.__vc = null; });
-  await viewer.waitForFunction(() => document.querySelector("#vcstream")?.hidden === true, null, { timeout: 5000 });
+  await viewer.waitForFunction(() => document.querySelector("#byo-stream")?.hidden === true, null, { timeout: 5000 });
   check("leaving the voice channel hides the panel", true);
 
-  await streamer.evaluate(() => window.__vcstream.stop());
-  check("disabling the plugin removes its UI", (await streamer.locator("#vcstream, #vcstream-style").count()) === 0);
+  await streamer.evaluate(() => window.__byoStream.stop());
+  check("disabling the plugin removes its UI", (await streamer.locator("#byo-stream, #byo-stream-style").count()) === 0);
   check("no uncaught page errors", streamer.errors.length + viewer.errors.length === 0, [...streamer.errors, ...viewer.errors].join("; "));
 } catch (error) {
   check("test ran to completion", false, error.message.split("\n")[0]);

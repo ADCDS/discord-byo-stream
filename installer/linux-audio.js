@@ -7,11 +7,11 @@ const { execFile, execFileSync } = require("node:child_process");
 const { promisify } = require("node:util");
 
 const run = promisify(execFile);
-const SINK_NAME = "vcstream_share";
-const SOURCE_NAME = "vcstream_capture";
+const SINK_NAME = "byo_stream_share";
+const SOURCE_NAME = "byo_stream_capture";
 // Chromium hides monitor sources from its input list, so a virtual input reads the
 // sink's monitor. This label is what the plugin looks for.
-const SOURCE_LABEL = "VCStream";
+const SOURCE_LABEL = "BYO-Stream"; // no spaces: pactl splits module arguments on them
 const SYNC_MS = 2000;
 
 /** Discord's own audio: the voice call, and streams it plays back. Never captured. */
@@ -122,12 +122,12 @@ class LinuxAudio {
     };
     const sinks = await pactlJson("list", "sinks");
     if (!sinks.some((sink) => sink.name === SINK_NAME)) {
-      await load("module-null-sink", `sink_name=${SINK_NAME}`, "sink_properties=device.description=VCStream-share", "channel_map=front-left,front-right");
+      await load("module-null-sink", `sink_name=${SINK_NAME}`, "sink_properties=device.description=BYO-Stream-share", "channel_map=front-left,front-right");
     }
     const sources = await pactlJson("list", "sources");
     if (!sources.some((source) => source.name === SOURCE_NAME)) {
       await load("module-remap-source", `master=${SINK_NAME}.monitor`, `source_name=${SOURCE_NAME}`, `source_properties=device.description=${SOURCE_LABEL}`, "channel_map=front-left,front-right");
-      this.log("created the VCStream capture device");
+      this.log("created the BYO Stream capture device");
     }
   }
 

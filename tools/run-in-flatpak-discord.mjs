@@ -24,15 +24,16 @@ if (!name) {
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const pluginCode = readFileSync(join(root, "dist", "public", "plugin.js"), "utf8");
 const accessKey = readFileSync(join(root, ".keys", `${name}.key`), "utf8").trim();
+const server = (process.env.BYO_SERVER || JSON.parse(readFileSync(join(root, "byo-stream.config.json"), "utf8")).server).replace(/\/+$/, "");
 
 // Same contract as installer/main.js: the plugin starts itself.
 const loader = `(() => {
   if (window.top !== window) return;
   const boot = () => {
     if (!document.body) return setTimeout(boot, 200);
-    (function (VCSTREAM_ACCESS_KEY) {
+    (function (BYO_ACCESS_KEY, BYO_SERVER) {
 ${pluginCode}
-    })(${JSON.stringify(accessKey)});
+    })(${JSON.stringify(accessKey)}, ${JSON.stringify(server)});
   };
   boot();
 })();`;
@@ -75,13 +76,13 @@ async function onHostCall({ payload, executionContextId }) {
     result = { ok: false, error: error.message };
   }
   if (request?.id == null) return;
-  const reply = `window.__vcstreamHostReply?.(${JSON.stringify(request.id)}, ${JSON.stringify(JSON.stringify(result))})`;
+  const reply = `window.__byoStreamHostReply?.(${JSON.stringify(request.id)}, ${JSON.stringify(JSON.stringify(result))})`;
   send("Runtime.evaluate", { expression: reply, contextId: executionContextId }).catch(() => {});
 }
 
 socket.onmessage = (event) => {
   const message = JSON.parse(event.data);
-  if (message.method === "Runtime.bindingCalled" && message.params.name === "vcstreamHost") {
+  if (message.method === "Runtime.bindingCalled" && message.params.name === "byoStreamHost") {
     onHostCall(message.params);
     return;
   }
@@ -108,7 +109,7 @@ const send = (method, params = {}) =>
 
 await send("Page.enable");
 await send("Runtime.enable");
-await send("Runtime.addBinding", { name: "vcstreamHost" });
+await send("Runtime.addBinding", { name: "byoStreamHost" });
 await send("Page.setBypassCSP", { enabled: true });
 await send("Page.addScriptToEvaluateOnNewDocument", { source: loader });
 if (process.argv.includes("--no-reload")) {
@@ -119,5 +120,5 @@ if (process.argv.includes("--no-reload")) {
 } else {
   await send("Page.reload");
 }
-console.log(`VCStream loaded for "${name}". Press Ctrl+C to stop.`);
+console.log(`BYO Stream loaded for "${name}". Press Ctrl+C to stop.`);
 await new Promise(() => {});

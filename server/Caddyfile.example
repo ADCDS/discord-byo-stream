@@ -1,12 +1,14 @@
-# Serve the token service and the installer files from your existing site, next to
-# a LiveKit proxied at /livekit. Put these routes before the site's catch-all.
-example.com {
-	route /dstream/dl/* {
-		uri strip_prefix /dstream/dl
-		root * /opt/discord-stream/public
-		header Cache-Control no-cache
-		file_server
-	}
+# Caddy gets the HTTPS certificate for the domain by itself. Point the domain's DNS
+# at this server first. With a CDN or proxy in front (such as Cloudflare's orange
+# cloud), turn it off for this domain: LiveKit's media must reach the server directly.
+streams.example.com {
+	# Optional, and it must come first: serve the installer files yourself from a
+	# build of this repository (dist/public), instead of people getting them from GitHub.
+	# route /dstream/dl/* {
+	# 	uri strip_prefix /dstream/dl
+	# 	root * /home/you/discord-byo-stream/dist/public
+	# 	file_server
+	# }
 	route /dstream/* {
 		uri strip_prefix /dstream
 		reverse_proxy localhost:8091
@@ -15,4 +17,5 @@ example.com {
 		uri strip_prefix /livekit
 		reverse_proxy localhost:7880
 	}
+	respond 404
 }

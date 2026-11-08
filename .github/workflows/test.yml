@@ -1,0 +1,58 @@
+# Builds every platform's release files and runs the offline tests on each system.
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, platform: linux }
+          - { os: macos-latest, platform: macos }
+          - { os: windows-latest, platform: windows }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: plugin/package-lock.json
+
+      - name: Install build tools
+        working-directory: plugin
+        run: npm ci --ignore-scripts
+
+      - name: Package
+        run: sh tools/package.sh ${{ matrix.platform }}
+
+      - name: Check the JavaScript parses
+        run: for f in installer/*.js dist/release-files/${{ matrix.platform }}/*.js; do node --check "$f"; done
+
+      - name: Test the audio source rules
+        run: node test/audio-source-test.mjs
+
+      - name: Test the installer (Linux, macOS)
+        if: matrix.platform != 'windows'
+        run: sh test/install-test.sh "dist/release-files/${{ matrix.platform }}"
+
+      - name: Test the installer (Windows)
+        if: matrix.platform == 'windows'
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File test\install-test.ps1
+
+      - name: Test the token server
+        if: matrix.platform == 'linux'
+        run: python3 test/server-test.py

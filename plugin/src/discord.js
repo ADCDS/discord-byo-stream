@@ -90,21 +90,21 @@ export function listSources() {
  * hear themselves. Discord avoids that by capturing one app with its native engine.
  */
 export function systemAudioBlocker() {
-  if (navigator.platform.startsWith("Mac") && !window.__vcstreamSystemAudio) return "macOS system audio needs the installer";
+  if (navigator.platform.startsWith("Mac") && !window.__byoStreamSystemAudio) return "macOS system audio needs the installer";
   if (navigator.platform.startsWith("Linux") && !hostAvailable()) return "system audio would include the voice call";
   return null;
 }
 
 // The Linux audio helper runs outside the page: in the Flatpak loader, reached through
 // a debug-protocol binding, or in the installer's hook, which watches console messages.
-const HOST_PREFIX = "[VCStream-host] ";
+const HOST_PREFIX = "[BYO-Stream-host] ";
 
 function hostAvailable() {
-  return typeof window.vcstreamHost === "function" || window.__vcstreamConsoleHost === true;
+  return typeof window.byoStreamHost === "function" || window.__byoStreamConsoleHost === true;
 }
 
 function sendToHost(json) {
-  if (typeof window.vcstreamHost === "function") window.vcstreamHost(json);
+  if (typeof window.byoStreamHost === "function") window.byoStreamHost(json);
   else console.debug(HOST_PREFIX + json);
 }
 
@@ -112,7 +112,7 @@ function sendToHost(json) {
 
 let nextHostCall = 0;
 const hostReplies = new Map();
-window.__vcstreamHostReply = (id, json) => {
+window.__byoStreamHostReply = (id, json) => {
   hostReplies.get(id)?.(JSON.parse(json));
   hostReplies.delete(id);
 };
@@ -169,7 +169,7 @@ const SYSTEM_AUDIO_TIMEOUT_MS = 65_000;
  * display-media handler. Throws if that path isn't available or fails.
  */
 async function captureWithSystemAudio({ sourceId, width, height, fps }) {
-  window.__vcstreamDisplayRequest = { sourceId, audio: true };
+  window.__byoStreamDisplayRequest = { sourceId, audio: true };
   let timer;
   let gaveUp = false;
   const timeout = new Promise((_, reject) => {
@@ -191,7 +191,7 @@ async function captureWithSystemAudio({ sourceId, width, height, fps }) {
     const audio = stream.getAudioTracks()[0] ?? null;
     // The installer's hook says what it granted and why, since Chromium reports per-app
     // device ids hashed: { device, reason, app }.
-    const granted = window.__vcstreamGrantedAudio ?? {};
+    const granted = window.__byoStreamGrantedAudio ?? {};
     if (!audio) return { video, audio: null, audioError: granted.reason ?? "no audio for this source" };
     // Only per-app capture leaves Discord's own sound out; anything else would echo the call.
     if (!String(granted.device ?? "").startsWith("applicationLoopback:")) {
@@ -201,13 +201,13 @@ async function captureWithSystemAudio({ sourceId, width, height, fps }) {
     return { video, audio, audioError: null, audioApps: [granted.app ?? granted.device.split(":")[1]] };
   } finally {
     clearTimeout(timer);
-    window.__vcstreamDisplayRequest = null;
-    window.__vcstreamGrantedAudio = null;
+    window.__byoStreamDisplayRequest = null;
+    window.__byoStreamGrantedAudio = null;
   }
 }
 
 async function captureRaw({ sourceId, sourceName, width, height, fps, wantAudio }) {
-  if (wantAudio && window.__vcstreamSystemAudio) {
+  if (wantAudio && window.__byoStreamSystemAudio) {
     try {
       return await captureWithSystemAudio({ sourceId, width, height, fps });
     } catch (error) {

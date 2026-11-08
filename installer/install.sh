@@ -1,12 +1,14 @@
 #!/bin/sh
-# VCStream installer for macOS and Linux. Re-run it to update, or after a Discord
-# update removes the hook.
-#   curl -fsSL __VCSTREAM_SERVER__/dstream/dl/install.sh | sh -s -- <access-key>
-#   curl -fsSL __VCSTREAM_SERVER__/dstream/dl/install.sh | sh -s -- --uninstall
-# From an unpacked release, run it next to its files: sh install.sh <access-key>
+# BYO Stream __BYO_VERSION__ installer for macOS and Linux. Run it again to update, or after
+# a Discord update removes the hook. It asks for anything not given:
+#   curl -fsSL __BYO_PAYLOAD_URL__/install.sh | sh
+#   curl -fsSL __BYO_PAYLOAD_URL__/install.sh | sh -s -- --server https://example.com <access-key>
+#   curl -fsSL __BYO_PAYLOAD_URL__/install.sh | sh -s -- --uninstall
+# From an unpacked release, run it next to its files: sh install.sh
 set -eu
 
-BASE_URL=__VCSTREAM_SERVER__/dstream/dl
+PAYLOAD_URL=__BYO_PAYLOAD_URL__
+DEFAULT_SERVER=__BYO_DEFAULT_SERVER__
 PAYLOAD="main.js plugin.js app-index.js audio-source.js linux-audio.js"
 
 # Next to an unpacked release, use its files instead of downloading them.
@@ -18,7 +20,6 @@ case "$0" in
     for file in $PAYLOAD; do [ -f "$dir/$file" ] || LOCAL_DIR=; done
     ;;
 esac
-ARG=${1:-}
 
 # macOS: the Discord apps this run closed, one path per line, to reopen at the end.
 CLOSED=
@@ -33,21 +34,71 @@ reopen_closed() {
 
 # Never leave Discord closed because of a failure.
 fail() {
-  printf 'VCStream: %s\n' "$1" >&2
+  printf 'BYO Stream: %s\n' "$1" >&2
   reopen_closed
   exit 1
 }
 
-case "$ARG" in
-  --uninstall) ;;
-  "") fail "missing access key. Usage: sh install.sh <access-key>" ;;
-  *[!A-Za-z0-9_-]*) fail "that access key has invalid characters" ;;
-esac
+UNINSTALL=
+SERVER=
+KEY=
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --uninstall) UNINSTALL=1 ;;
+    --server) [ $# -ge 2 ] || fail "--server needs an address"; SERVER=$2; shift ;;
+    --server=*) SERVER=${1#--server=} ;;
+    -h|--help) printf 'Usage: sh install.sh [--server https://example.com] [access-key]\n       sh install.sh --uninstall\n'; exit 0 ;;
+    -*) fail "unknown option $1" ;;
+    *) [ -z "$KEY" ] || fail "unexpected argument $1"; KEY=$1 ;;
+  esac
+  shift
+done
+
+# Questions go to the terminal, which still works when this script arrives through a pipe.
+# NONINTERACTIVE=1 never asks, for scripts.
+has_tty() { [ -z "${NONINTERACTIVE:-}" ] && (: < /dev/tty) 2>/dev/null; }
+ask() { # $1 = question, $2 = suggested answer
+  has_tty || return 1
+  if [ -n "$2" ]; then printf '%s [%s]: ' "$1" "$2" > /dev/tty; else printf '%s: ' "$1" > /dev/tty; fi
+  IFS= read -r answer < /dev/tty || answer=
+  [ -n "$answer" ] || answer=$2
+  printf '%s' "$answer"
+}
+
+if [ -z "$UNINSTALL" ]; then
+  if [ -z "$SERVER" ]; then
+    SERVER=$(ask "Server address (from whoever gave you your access key)" "$DEFAULT_SERVER") ||
+      fail "no server given. Usage: sh install.sh --server https://example.com <access-key>"
+  fi
+  # Accept "example.com" and trailing slashes, as people paste them.
+  case "$SERVER" in http://*) fail "the server must use https://" ;; https://*) ;; ?*) SERVER="https://$SERVER" ;; esac
+  SERVER=$(printf '%s' "$SERVER" | sed 's:/*$::')
+  printf '%s' "$SERVER" | grep -Eq '^https://[A-Za-z0-9.-]+(:[0-9]+)?$' || fail "\"$SERVER\" isn't a server address like https://example.com"
+  if [ -z "$KEY" ]; then
+    KEY=$(ask "Access key" "") || fail "no access key given. Usage: sh install.sh --server $SERVER <access-key>"
+  fi
+  KEY=$(printf '%s' "$KEY" | tr -d ' \r\n')
+  case "$KEY" in
+    "") fail "no access key given" ;;
+    *[!A-Za-z0-9_-]*) fail "that access key has invalid characters. Copy it again, exactly as you got it." ;;
+  esac
+fi
+
+# A wrong address or key fails here, before anything is changed.
+check_server() {
+  code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 -H "Authorization: Bearer $KEY" "$SERVER/dstream/check" 2>/dev/null) || code=000
+  case "$code" in
+    200) ;;
+    401) fail "$SERVER didn't accept that access key. Copy it again, exactly as you got it." ;;
+    000) fail "couldn't reach $SERVER. Check the address and your internet connection." ;;
+    *) fail "$SERVER doesn't look like a BYO Stream server (HTTP $code). Check the address." ;;
+  esac
+}
 
 OS=$(uname -s)
 case "$OS" in
-  Darwin) DATA_DIR="$HOME/Library/Application Support/VCStream" ;;
-  Linux) DATA_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/VCStream" ;;
+  Darwin) DATA_DIR="$HOME/Library/Application Support/discord-byo-stream" ;;
+  Linux) DATA_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/discord-byo-stream" ;;
   *) fail "unsupported system: $OS" ;;
 esac
 
@@ -62,7 +113,7 @@ find_resources() {
       mdfind "kMDItemCFBundleIdentifier == 'com.hnc.Discord*'" 2>/dev/null || true
     } | while IFS= read -r app; do
       dir="$app/Contents/Resources"
-      if [ -e "$dir/app.asar" ] || [ -e "$dir/vcstream.app.asar" ]; then printf '%s\n' "$dir"; fi
+      if [ -e "$dir/app.asar" ] || [ -e "$dir/byo-stream.app.asar" ]; then printf '%s\n' "$dir"; fi
     done | awk '!seen[$0]++'
   else
     for channel in discord discordptb discordcanary; do
@@ -104,7 +155,7 @@ close_discord() {
 permission_help() {
   if [ "$OS" = Darwin ]; then
     if [ ! -O "$1" ]; then
-      fail "${1%/Contents/Resources} belongs to another user account. Install VCStream from that account, or reinstall Discord for yours."
+      fail "${1%/Contents/Resources} belongs to another user account. Install BYO Stream from that account, or reinstall Discord for yours."
     fi
     fail "macOS blocked changes to Discord.app. Turn on your terminal app under System Settings > Privacy & Security > App Management, then run this again."
   fi
@@ -112,7 +163,7 @@ permission_help() {
 }
 
 check_writable() {
-  probe="$1/.vcstream-probe"
+  probe="$1/.byo-stream-probe"
   (: > "$probe") 2>/dev/null || permission_help "$1"
   rm -f "$probe"
 }
@@ -122,10 +173,10 @@ hook() {
 
   # A live app.asar is always Discord's current app, so any preserved copy is stale.
   if [ -e "$res/app.asar" ]; then
-    rm -f "$res/vcstream.app.asar"
-    mv "$res/app.asar" "$res/vcstream.app.asar" || permission_help "$res"
+    rm -f "$res/byo-stream.app.asar"
+    mv "$res/app.asar" "$res/byo-stream.app.asar" || permission_help "$res"
   fi
-  [ -e "$res/vcstream.app.asar" ] || fail "no app.asar in $res"
+  [ -e "$res/byo-stream.app.asar" ] || fail "no app.asar in $res"
 
   if ! { mkdir -p "$res/app" &&
          printf '{"main":"./index.js"}\n' > "$res/app/package.json" &&
@@ -139,46 +190,52 @@ hook() {
 unhook() {
   res=$1
   rm -rf "$res/app"
-  if [ -e "$res/vcstream.app.asar" ] && [ ! -e "$res/app.asar" ]; then
-    mv "$res/vcstream.app.asar" "$res/app.asar" || permission_help "$res"
+  if [ -e "$res/byo-stream.app.asar" ] && [ ! -e "$res/app.asar" ]; then
+    mv "$res/byo-stream.app.asar" "$res/app.asar" || permission_help "$res"
   fi
-  rm -f "$res/vcstream.app.asar"
+  rm -f "$res/byo-stream.app.asar"
 }
 
 RESOURCES=$(find_resources)
 if [ -z "$RESOURCES" ]; then
-  if [ -d /var/lib/flatpak/app/com.discordapp.Discord ]; then
-    fail "this is a system-wide Flatpak Discord, whose files are read-only. Use tools/run-in-flatpak-discord.mjs instead."
+  if [ "$OS" = Linux ]; then
+    for sandboxed in /var/lib/flatpak/app/com.discordapp.Discord "$HOME/.local/share/flatpak/app/com.discordapp.Discord" /snap/discord; do
+      if [ -d "$sandboxed" ]; then
+        fail "only a Flatpak or Snap Discord is installed, and their files are read-only. Install Discord's .deb or .tar.gz from discord.com, open it once, then run this again."
+      fi
+    done
   fi
   fail "couldn't find Discord. Install it and open it once, then run this again."
 fi
 
 # Everything that can fail without touching Discord happens before closing it.
 printf '%s\n' "$RESOURCES" | while IFS= read -r res; do check_writable "$res"; done || exit 1
-if [ "$ARG" != --uninstall ]; then
+if [ -z "$UNINSTALL" ]; then
+  check_server
   mkdir -p "$DATA_DIR"
   chmod 700 "$DATA_DIR"
   for file in $PAYLOAD; do
     if [ -n "$LOCAL_DIR" ]; then
       cp "$LOCAL_DIR/$file" "$DATA_DIR/$file.new" || fail "copying $file failed"
     else
-      curl -fsSL --retry 2 "$BASE_URL/$file" -o "$DATA_DIR/$file.new" || fail "download of $file failed"
+      curl -fsSL --retry 2 "$PAYLOAD_URL/$file" -o "$DATA_DIR/$file.new" || fail "download of $file failed"
     fi
     [ -s "$DATA_DIR/$file.new" ] || fail "$file is empty"
     mv "$DATA_DIR/$file.new" "$DATA_DIR/$file"
   done
-  (umask 077; printf '{"accessKey":"%s"}\n' "$ARG" > "$DATA_DIR/config.json")
+  # Both values were checked against strict patterns above, so they need no escaping.
+  (umask 077; printf '{"accessKey":"%s","server":"%s"}\n' "$KEY" "$SERVER" > "$DATA_DIR/config.json")
 fi
 
 close_discord
 
-if [ "$ARG" = --uninstall ]; then
+if [ -n "$UNINSTALL" ]; then
   printf '%s\n' "$RESOURCES" | while IFS= read -r res; do unhook "$res"; done || fail "uninstall failed"
   rm -rf "$DATA_DIR"
-  printf 'VCStream removed.\n'
+  printf 'BYO Stream removed.\n'
 else
   printf '%s\n' "$RESOURCES" | while IFS= read -r res; do hook "$res"; done || fail "install failed"
-  printf 'VCStream installed.\n'
+  printf 'BYO Stream installed for %s.\n' "$SERVER"
 fi
 
 if [ -n "$CLOSED" ]; then
