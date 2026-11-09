@@ -1,5 +1,6 @@
 // One LiveKit connection for the voice channel the user is currently in.
-import { Room, RoomEvent, ScreenSharePresets, Track } from "livekit-client";
+import { Room, RoomEvent, Track, VideoPreset } from "livekit-client";
+import { encoderInUse, hasHardwareH264, limitedBy, lowLayerSize } from "./encoder.js";
 
 export const QUALITY = {
   "720p30": { width: 1280, height: 720, fps: 30, maxBitrate: 3_000_000 },
@@ -13,12 +14,17 @@ export const MODES = {
   sharp: { label: "Sharper", contentHint: "detail", degradationPreference: "maintain-resolution" },
 };
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 function pickVideoCodec() {
   const available = (RTCRtpSender.getCapabilities("video")?.codecs ?? []).map((c) => c.mimeType.toLowerCase());
   return ["video/h264", "video/vp9", "video/vp8"].find((c) => available.includes(c))?.split("/")[1] ?? "vp8";
 }
 
 export class Session {
+  /** The setup that got a hardware encoder, reused for later streams in this Discord session. */
+  static hardwareSetup = null;
+
   constructor({ apiUrl, accessKey, channelId, userId, displayName, onChange, log }) {
     Object.assign(this, { apiUrl, accessKey, channelId, userId, displayName, onChange, log });
     this.room = new Room({ adaptiveStream: false, dynacast: false });
@@ -160,50 +166,123 @@ export class Session {
     this.room.localParticipant.setAttributes({ watching }).catch((error) => this.log(`attributes failed: ${error.message}`));
   }
 
-  /** @param preset { maxBitrate, fps } */
+  /**
+   * Publishes a capture. Where the computer has a hardware H.264 encoder, checks that
+   * the stream really got it, and if not, tries the setups that can: Chromium encodes
+   * simulcast layers in software in some cases. Where there's only software encoding
+   * and the CPU can't keep up, turns the smaller layer off.
+   * @param preset { maxBitrate, fps }
+   */
   async startShare({ video, audio, audioError, audioApps, cleanup, preset, label, mode }) {
     const { contentHint, degradationPreference } = MODES[mode];
     const videoCodec = pickVideoCodec();
-    video.contentHint = contentHint;
     video.addEventListener("ended", () => {
       this.log("capture ended by the system");
       this.stopShare();
     });
     this.publishing = { videoTrack: video, audioTrack: audio, audioError, audioApps, cleanup, videoCodec, quality: label, mode };
+    const share = this.publishing;
     const local = this.room.localParticipant;
     try {
-      this.publishing.videoPublication = await local.publishTrack(video, {
-        source: Track.Source.ScreenShare,
-        // A light 720p version lets a new viewer start right away, before the
-        // server has measured that their connection can take the full stream.
-        simulcast: true,
-        screenShareSimulcastLayers: [ScreenSharePresets.h720fps15],
-        videoCodec,
-        screenShareEncoding: { maxBitrate: preset.maxBitrate, maxFramerate: preset.fps },
-        degradationPreference,
-      });
-      if (audio) {
-        this.publishing.audioPublication = await local.publishTrack(audio, {
+      const size = await Promise.race([video.frameSize ?? Promise.resolve(null), sleep(3000).then(() => null)]);
+      const hardware = videoCodec === "h264" && size
+        ? await hasHardwareH264({ width: size.width, height: size.height, fps: preset.fps, bitrate: preset.maxBitrate })
+        : false;
+      const sizeNote = size ? `${size.width}x${size.height}` : "unknown size";
+      this.log(`hardware ${videoCodec} encoder for ${sizeNote}: ${hardware === null ? "unknown" : hardware ? "yes" : "no"}`);
+
+      // A smaller layer lets new viewers start right away, before the server has
+      // measured that their connection can take the full stream.
+      const attempts = [{ simulcast: true, hint: contentHint }];
+      if (hardware) {
+        attempts.push({ simulcast: false, hint: contentHint });
+        // Chromium may send screen content ("detail") to the software encoder.
+        if (contentHint !== "motion") attempts.push({ simulcast: false, hint: "motion" });
+      }
+      // Within one Discord session, start from what worked last time.
+      const known = attempts.findIndex((a) => a.simulcast === Session.hardwareSetup?.simulcast && a.hint === Session.hardwareSetup?.hint);
+      if (known > 0) attempts.unshift(...attempts.splice(known, 1));
+
+      const publishAudio = async () => {
+        if (!audio || share.audioPublication || this.publishing !== share) return;
+        share.audioPublication = await local.publishTrack(audio, {
           source: Track.Source.ScreenShareAudio,
           dtx: false,
           red: false,
           audioPreset: { maxBitrate: 128_000 },
           forceStereo: true,
         });
+      };
+      for (const [index, attempt] of attempts.entries()) {
+        video.contentHint = attempt.hint;
+        share.videoPublication = await local.publishTrack(video, {
+          source: Track.Source.ScreenShare,
+          simulcast: attempt.simulcast && Boolean(size),
+          screenShareSimulcastLayers: attempt.simulcast && size
+            ? [new VideoPreset(lowLayerSize(size).width, lowLayerSize(size).height, 1_500_000, 15)]
+            : undefined,
+          videoCodec,
+          screenShareEncoding: { maxBitrate: preset.maxBitrate, maxFramerate: preset.fps },
+          degradationPreference,
+        });
+        share.simulcast = attempt.simulcast && Boolean(size);
+        // Sound doesn't depend on how the video is encoded, so it starts right away.
+        await publishAudio();
+        const used = await encoderInUse(share.videoPublication.track.sender);
+        share.encoder = used;
+        const setup = `${attempt.simulcast ? "two layers" : "one layer"}, content ${attempt.hint}`;
+        this.log(`encoder with ${setup}: ${used ? `${used.implementation}${used.hardware ? " (hardware)" : " (software)"}` : "not reported"}`);
+        if (!hardware || used?.hardware || index === attempts.length - 1) {
+          if (used?.hardware) Session.hardwareSetup = attempt;
+          break;
+        }
+        if (this.publishing !== share) return;
+        await local.unpublishTrack(video, false);
       }
+      if (this.publishing !== share) return;
     } catch (error) {
       await this.stopShare();
       throw error;
     }
+    if (!share.encoder?.hardware && share.simulcast) this.relieveCpu(share);
     const audioNote = audio ? `yes${audioApps ? ` (${audioApps.join(", ") || "nothing playing yet"})` : ""}` : `no (${audioError ?? "not requested"})`;
-    this.log(`publishing ${label} ${mode} ${videoCodec}, audio=${audioNote}`);
+    const encoderNote = share.encoder ? `${share.encoder.hardware ? "hardware" : "software"} ${share.encoder.implementation}` : "encoder unknown";
+    this.log(`publishing ${label} ${mode} ${videoCodec}, ${share.simulcast ? "two layers" : "one layer"}, ${encoderNote}, audio=${audioNote}`);
     this.onChange();
+  }
+
+  /**
+   * With software encoding, a busy CPU makes WebRTC shrink the picture. Encoding the
+   * smaller layer too costs about a third more, so turn it off once the CPU has been
+   * the limit for a few seconds. Viewers then all get the full layer.
+   */
+  relieveCpu(share) {
+    let strikes = 0;
+    share.cpuTimer = setInterval(async () => {
+      const sender = share.videoPublication?.track?.sender;
+      if (this.publishing !== share || !sender) return clearInterval(share.cpuTimer);
+      const reason = await limitedBy(sender).catch(() => null);
+      strikes = reason === "cpu" ? strikes + 1 : 0;
+      if (strikes < 3) return;
+      const params = sender.getParameters();
+      const low = params.encodings.find((encoding) => encoding.rid === "q");
+      if (!low || low.active === false || params.encodings.length < 2) return;
+      low.active = false;
+      try {
+        await sender.setParameters(params);
+        this.log("the CPU can't keep up: turned off the stream's smaller layer");
+      } catch (error) {
+        this.log(`couldn't turn off the smaller layer: ${error.message}`);
+      }
+      strikes = 0;
+    }, 2000);
   }
 
   async stopShare() {
     const share = this.publishing;
     if (!share) return;
     this.publishing = null;
+    clearInterval(share.cpuTimer);
     share.cleanup?.();
     const local = this.room.localParticipant;
     for (const track of [share.videoTrack, share.audioTrack]) {

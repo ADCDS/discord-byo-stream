@@ -58,7 +58,8 @@ function stubDiscord({ channel, displayName, blocks }) {
   };
   navigator.mediaDevices.getUserMedia = async (constraints) => {
     window.__gum.push(constraints);
-    const canvas = Object.assign(document.createElement("canvas"), { width: 1280, height: 720 });
+    // An odd size, as windows can be: the plugin trims it to a multiple of 8.
+    const canvas = Object.assign(document.createElement("canvas"), { width: 1606, height: 1078 });
     const g = canvas.getContext("2d");
     let frame = 0;
     setInterval(() => {
@@ -68,7 +69,7 @@ function stubDiscord({ channel, displayName, blocks }) {
       // like a game would, plus a solid corner block the viewer can identify.
       for (let i = 0; i < blocks; i++) {
         g.fillStyle = `hsl(${Math.random() * 360} 90% 50%)`;
-        g.fillRect(Math.random() * 1280, Math.random() * 720, 60, 60);
+        g.fillRect(Math.random() * 1606, Math.random() * 1078, 60, 60);
       }
       g.fillStyle = frame % 60 < 30 ? "#f00" : "#00f";
       g.fillRect(0, 0, 320, 320);
@@ -103,7 +104,9 @@ async function client(displayName) {
     route.fulfill({ contentType: "text/html", body: "<!doctype html><title>stub</title><body></body>" }));
   const page = await context.newPage();
   page.errors = [];
+  page.logs = [];
   page.on("pageerror", (error) => page.errors.push(error.message));
+  page.on("console", (message) => page.logs.push(message.text()));
   await page.addInitScript(stubDiscord, { channel: CHANNEL, displayName, blocks: BLOCKS });
   await page.goto("https://discord.com/channels/test");
   await page.evaluate(loadLikeMainProcess, { code: pluginCode, key: accessKey, server });
@@ -165,10 +168,22 @@ try {
     const sending = await streamer.locator("#byo-stream .stats").textContent();
     const elapsed = Math.round((Date.now() - startedAt) / 1000);
     console.log(`      t+${String(elapsed).padStart(2)}s  ${lastLine}   <<  ${sending}`);
-    if (rampSeconds === null && /watching 1280x720/.test(lastLine)) rampSeconds = elapsed;
+    if (rampSeconds === null && /watching 1600x1072/.test(lastLine)) rampSeconds = elapsed;
     if (rampSeconds !== null && elapsed >= rampSeconds + 6) break;
   }
   check("ramps up to full resolution", rampSeconds !== null, `after ${rampSeconds}s`);
+
+  const layers = await streamer.evaluate(async () => {
+    const out = [];
+    (await window.__byoStream.session.publishing.videoPublication.track.sender.getStats()).forEach((s) => {
+      if (s.type === "outbound-rtp" && s.kind === "video") out.push(`${s.rid}:${s.frameWidth}x${s.frameHeight}`);
+    });
+    return out.sort();
+  });
+  // Hardware H.264 encoders only take even sizes.
+  check("both layers have even sizes", layers.length === 2 && layers.every((l) => /:\d*[02468]x\d*[02468]$/.test(l)), layers.join(" "));
+  check("the plugin logs which encoder it got", streamer.logs.some((l) => /encoder with two layers, content motion: \S/.test(l)), streamer.logs.filter((l) => /encoder/.test(l)).join(" | "));
+
 
   const audioPeak = await viewer.evaluate(async () => {
     const stream = document.querySelector("audio")?.srcObject ?? window.__byoStream.audioEl?.srcObject;

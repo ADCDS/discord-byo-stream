@@ -255,7 +255,16 @@ async function answerHost(contents, json) {
   contents.executeJavaScript(reply).catch(() => {});
 }
 
+let gpuLogged = false;
+
 function watchPlugin(contents) {
+  // By the time Discord's window loads, the GPU process has reported what it can do.
+  // "enabled" video_encode means streams can use the hardware encoder.
+  if (!gpuLogged) {
+    gpuLogged = true;
+    const gpu = app.getGPUFeatureStatus();
+    log(`gpu: video_encode ${gpu.video_encode}, video_decode ${gpu.video_decode}`);
+  }
   // Electron 35+ passes one details object; older versions pass (event, level, message).
   contents.on("console-message", (...args) => {
     const message = typeof args[0]?.message === "string" ? args[0].message : args[2];
