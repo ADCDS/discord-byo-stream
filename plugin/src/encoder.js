@@ -44,6 +44,33 @@ export async function encoderInUse(sender, timeoutMs = 3000) {
   return null;
 }
 
+/**
+ * One line on what this computer can encode, for the log: per codec, whether WebRTC
+ * has it in hardware, and whether WebCodecs (the same video hardware, outside
+ * WebRTC) can use the hardware encoder.
+ */
+export async function describeEncoders() {
+  const size = { width: 1920, height: 1080, bitrate: 5_000_000, framerate: 30 };
+  const parts = [];
+  for (const [name, contentType] of [["h264", H264], ["h265", "video/H265"], ["vp8", "video/VP8"], ["vp9", "video/VP9"], ["av1", "video/AV1"]]) {
+    try {
+      const info = await navigator.mediaCapabilities.encodingInfo({ type: "webrtc", video: { contentType, ...size } });
+      parts.push(`webrtc ${name} ${info.supported ? (info.powerEfficient ? "hardware" : "software") : "none"}`);
+    } catch {
+      parts.push(`webrtc ${name} unknown`);
+    }
+  }
+  for (const [name, codec] of [["h264", "avc1.42e028"], ["hevc", "hvc1.1.6.L120.B0"]]) {
+    try {
+      const result = await VideoEncoder.isConfigSupported({ codec, ...size, hardwareAcceleration: "prefer-hardware" });
+      parts.push(`webcodecs ${name} hardware ${result.supported ? "yes" : "no"}`);
+    } catch (error) {
+      parts.push(`webcodecs ${name} hardware unknown (${error.name})`);
+    }
+  }
+  return parts.join(", ");
+}
+
 /** Why the encoder is holding back ("cpu", "bandwidth", "none"), or null if unknown. */
 export async function limitedBy(sender) {
   let reason = null;

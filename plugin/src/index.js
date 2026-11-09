@@ -1,5 +1,6 @@
 // A floating panel while you're in a voice channel.
 import { capture, getDisplayName, getStore, getUserId, getVoiceChannelId, listSources, systemAudioBlocker } from "./discord.js";
+import { describeEncoders } from "./encoder.js";
 import { NativeBridge } from "./native.js";
 import { MODES, QUALITY, Session } from "./session.js";
 import { publisherStats, viewerStats } from "./stats.js";
@@ -95,6 +96,7 @@ class ByoStream {
     this.statsTimer = setInterval(() => this.refreshStats(), STATS_MS);
     this.tick();
     this.log(`started v${VERSION}`);
+    describeEncoders().then((line) => this.log(`video encoders: ${line}`)).catch(() => {});
   }
 
   stop() {

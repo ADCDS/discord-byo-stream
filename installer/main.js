@@ -264,6 +264,10 @@ function watchPlugin(contents) {
     gpuLogged = true;
     const gpu = app.getGPUFeatureStatus();
     log(`gpu: video_encode ${gpu.video_encode}, video_decode ${gpu.video_decode}`);
+    app.getGPUInfo("complete").then((info) => {
+      const encoders = info.videoEncodeAcceleratorSupportedProfile ?? info.videoEncodeAcceleratorSupportedProfiles ?? null;
+      log(`gpu: hardware video encoders ${JSON.stringify(encoders).slice(0, 800)}`);
+    }).catch((error) => log(`gpu info failed: ${error.message}`));
   }
   // Electron 35+ passes one details object; older versions pass (event, level, message).
   contents.on("console-message", (...args) => {
