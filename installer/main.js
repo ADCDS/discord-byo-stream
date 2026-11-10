@@ -30,6 +30,29 @@ function readConfig() {
 }
 
 const CONFIG = readConfig();
+
+// Chromium features to switch on in Discord, merged into the enable-features list
+// Discord sets itself: Chromium keeps only the last value of a switch. On macOS,
+// WebRTC can use the hardware HEVC encoder, but Chromium keeps HEVC off by default;
+// with these, encoder tests can try it (streams still choose H.264).
+const EXTRA_FEATURES = process.platform === "darwin" ? ["WebRtcAllowH265Send", "WebRtcAllowH265Receive"] : [];
+
+function enableFeatures() {
+  if (!EXTRA_FEATURES.length) return;
+  const commandLine = app.commandLine;
+  const merge = (value) => [...new Set([...String(value ?? "").split(","), ...EXTRA_FEATURES].filter(Boolean))].join(",");
+  const append = commandLine.appendSwitch.bind(commandLine);
+  commandLine.appendSwitch = (name, value) => append(name, name === "enable-features" ? merge(value) : value);
+  append("enable-features", merge(commandLine.getSwitchValue("enable-features")));
+}
+
+if (CONFIG) {
+  try {
+    enableFeatures();
+  } catch (error) {
+    log(`couldn't enable Chromium features: ${error.message}`);
+  }
+}
 // LiveKit must be served from the same host as the token server (at /livekit).
 const SERVER_HOST = CONFIG ? new URL(CONFIG.server).host : null;
 const SERVER_ORIGINS = SERVER_HOST ? [`https://${SERVER_HOST}`, `wss://${SERVER_HOST}`] : [];
@@ -255,6 +278,25 @@ async function answerHost(contents, json) {
   contents.executeJavaScript(reply).catch(() => {});
 }
 
+// Encoder tests on request: whoever can write to this folder (only the user's own
+// account) can ask the plugin to run them. The file holds test settings, not code;
+// the plugin checks every value (see plugin/src/benchmark.js).
+const DIAGNOSE_FILE = path.join(HOME, "diagnose.json");
+
+function runRequestedDiagnosis(contents) {
+  let request;
+  try {
+    if (!fs.existsSync(DIAGNOSE_FILE) || fs.statSync(DIAGNOSE_FILE).size > 8192) return;
+    request = JSON.parse(fs.readFileSync(DIAGNOSE_FILE, "utf8"));
+  } catch (error) {
+    log(`diagnose.json unreadable: ${error.message}`);
+  } finally {
+    fs.rmSync(DIAGNOSE_FILE, { force: true });
+  }
+  if (!request) return;
+  contents.executeJavaScript(`window.__byoStream?.diagnose?.(${JSON.stringify(request)})`).catch(() => {});
+}
+
 let gpuLogged = false;
 
 function watchPlugin(contents) {
@@ -263,7 +305,7 @@ function watchPlugin(contents) {
   if (!gpuLogged) {
     gpuLogged = true;
     const gpu = app.getGPUFeatureStatus();
-    log(`gpu: video_encode ${gpu.video_encode}, video_decode ${gpu.video_decode}`);
+    log(`gpu: video_encode ${gpu.video_encode}, video_decode ${gpu.video_decode}; enable-features ${app.commandLine.getSwitchValue("enable-features")}`);
     app.getGPUInfo("complete").then((info) => {
       const encoders = info.videoEncodeAcceleratorSupportedProfile ?? info.videoEncodeAcceleratorSupportedProfiles ?? null;
       log(`gpu: hardware video encoders ${JSON.stringify(encoders).slice(0, 800)}`);
@@ -278,6 +320,7 @@ function watchPlugin(contents) {
   });
   const timer = setInterval(() => {
     if (contents.isDestroyed()) return clearInterval(timer);
+    runRequestedDiagnosis(contents);
     contents
       .executeJavaScript("window.__byoStream?.report ? window.__byoStream.report().then((r) => JSON.stringify(r, null, 1)) : null")
       .then((report) => report && fs.writeFileSync(STATUS_FILE, report))

@@ -1,5 +1,6 @@
 // A floating panel while you're in a voice channel.
 import { capture, getDisplayName, getStore, getUserId, getVoiceChannelId, listSources, systemAudioBlocker } from "./discord.js";
+import { runBenchmark } from "./benchmark.js";
 import { describeEncoders } from "./encoder.js";
 import { NativeBridge } from "./native.js";
 import { MODES, QUALITY, Session } from "./session.js";
@@ -477,6 +478,17 @@ class ByoStream {
   }
 
   /** Plugin state for troubleshooting. Never contains the access key. */
+  /** Runs encoder tests on request from the hook (see benchmark.js). */
+  async diagnose(request) {
+    if (this.benchmarking) return this.log("benchmark already running");
+    this.benchmarking = true;
+    try {
+      await runBenchmark(request, { apiUrl: API_URL, accessKey: ACCESS_KEY, log: this.log });
+    } finally {
+      this.benchmarking = false;
+    }
+  }
+
   async report() {
     const session = this.session;
     const sending = session ? await publisherStats(session).catch(() => null) : null;

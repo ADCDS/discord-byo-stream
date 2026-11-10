@@ -52,7 +52,12 @@ export async function encoderInUse(sender, timeoutMs = 3000) {
 export async function describeEncoders() {
   const size = { width: 1920, height: 1080, bitrate: 5_000_000, framerate: 30 };
   const parts = [];
-  for (const [name, contentType] of [["h264", H264], ["h265", "video/H265"], ["vp8", "video/VP8"], ["vp9", "video/VP9"], ["av1", "video/AV1"]]) {
+  const h264 = (profile) => `video/H264;level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=${profile}`;
+  const codecs = [
+    ["h264", H264], ["h264-baseline", h264("42001f")], ["h264-main", h264("4d001f")], ["h264-high", h264("640c1f")],
+    ["h265", "video/H265"], ["vp8", "video/VP8"], ["vp9", "video/VP9"], ["av1", "video/AV1"],
+  ];
+  for (const [name, contentType] of codecs) {
     try {
       const info = await navigator.mediaCapabilities.encodingInfo({ type: "webrtc", video: { contentType, ...size } });
       parts.push(`webrtc ${name} ${info.supported ? (info.powerEfficient ? "hardware" : "software") : "none"}`);
