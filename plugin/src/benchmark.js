@@ -4,6 +4,7 @@
 // to a throwaway LiveKit room for a few seconds, then logs which encoder WebRTC used,
 // whether it was hardware, and what limited it. Nothing is captured from the screen.
 import { Room, Track, VideoPreset } from "livekit-client";
+import { installHardwareH264, withOurConnections } from "./h264-hardware.js";
 
 const CODECS = ["h264", "h265", "vp8", "vp9", "av1"];
 const HINTS = ["motion", "detail", ""];
@@ -84,6 +85,7 @@ function clean(test) {
     simulcast: test.simulcast === true,
     hint: HINTS.includes(test.hint) ? test.hint : "motion",
     fmtp: typeof test.fmtp === "string" ? test.fmtp.replace(/[^a-z0-9=;-]/gi, "").slice(0, 60) : "",
+    baseline: test.baseline === true, // Baseline H.264 sent as Constrained Baseline, as h264-hardware.js does
     width: n(test.width, 160, 3840, 1600) & ~7,
     height: n(test.height, 120, 2160, 1072) & ~7,
     seconds: n(test.seconds, 2, 10, 5),
@@ -104,7 +106,12 @@ async function runOne(test, { apiUrl, accessKey, log }) {
   const source = syntheticTrack(test.width, test.height);
   const preference = preferFmtp(test.fmtp);
   try {
-    await room.connect(url, token, { autoSubscribe: false });
+    if (test.baseline) {
+      installHardwareH264();
+      await withOurConnections(() => room.connect(url, token, { autoSubscribe: false }));
+    } else {
+      await room.connect(url, token, { autoSubscribe: false });
+    }
     source.track.contentHint = test.hint;
     const publication = await room.localParticipant.publishTrack(source.track, {
       source: Track.Source.ScreenShare,

@@ -22,8 +22,10 @@ function check(name, ok, detail = "") {
   if (!ok) failures++;
 }
 
-function stubDiscord({ channel, displayName, blocks }) {
+function stubDiscord({ channel, displayName, blocks, baseline }) {
   window.__vc = channel;
+  // BASELINE=1 runs the Mac's hardware-H.264 path (h264-hardware.js) on any computer.
+  window.__byoStreamForceH264Relabel = baseline;
   // Linux would refuse system audio because of the echo; the test exercises the audio path.
   Object.defineProperty(navigator, "platform", { get: () => "Win32" });
   window.__gum = [];
@@ -107,7 +109,7 @@ async function client(displayName) {
   page.logs = [];
   page.on("pageerror", (error) => page.errors.push(error.message));
   page.on("console", (message) => page.logs.push(message.text()));
-  await page.addInitScript(stubDiscord, { channel: CHANNEL, displayName, blocks: BLOCKS });
+  await page.addInitScript(stubDiscord, { channel: CHANNEL, displayName, blocks: BLOCKS, baseline: process.env.BASELINE === "1" });
   await page.goto("https://discord.com/channels/test");
   await page.evaluate(loadLikeMainProcess, { code: pluginCode, key: accessKey, server });
   return page;
@@ -181,6 +183,14 @@ try {
     return out.sort();
   });
   // Hardware H.264 encoders only take even sizes.
+  const negotiated = await streamer.evaluate(async () => {
+    let codec = null;
+    const report = await window.__byoStream.session.publishing.videoPublication.track.sender.getStats();
+    report.forEach((s) => { if (s.type === "outbound-rtp" && s.kind === "video" && s.codecId) codec = report.get(s.codecId)?.sdpFmtpLine ?? null; });
+    return codec;
+  });
+  const wanted = process.env.BASELINE === "1" ? "42001f" : "42e01f";
+  check(`streamer encodes H.264 profile ${wanted}`, (negotiated ?? "").includes(`profile-level-id=${wanted}`), negotiated);
   check("both layers have even sizes", layers.length === 2 && layers.every((l) => /:\d*[02468]x\d*[02468]$/.test(l)), layers.join(" "));
   check("the plugin logs which encoder it got", streamer.logs.some((l) => /encoder with two layers, content motion: \S/.test(l)), streamer.logs.filter((l) => /encoder/.test(l)).join(" | "));
 

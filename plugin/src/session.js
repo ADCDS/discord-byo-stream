@@ -1,6 +1,7 @@
 // One LiveKit connection for the voice channel the user is currently in.
 import { Room, RoomEvent, Track, VideoPreset } from "livekit-client";
 import { encoderInUse, hasHardwareH264, limitedBy, lowLayerSize } from "./encoder.js";
+import { h264HardwareSupport, installHardwareH264, withOurConnections } from "./h264-hardware.js";
 
 export const QUALITY = {
   "720p30": { width: 1280, height: 720, fps: 30, maxBitrate: 3_000_000 },
@@ -77,7 +78,17 @@ export class Session {
       if (!response.ok) throw new Error(`token request failed: HTTP ${response.status}`);
       const { url, token } = await response.json();
       if (this.closed) return;
-      await this.room.connect(url, token, { autoSubscribe: false });
+      // Where Chromium has hardware H.264 only as Baseline, our connection asks for it
+      // (see h264-hardware.js). Decided before connecting, since it shapes every offer.
+      const support = await h264HardwareSupport();
+      this.baselineH264 = window.__byoStreamForceH264Relabel === true || (support.constrainedBaseline === false && support.baseline === true);
+      if (this.baselineH264) {
+        installHardwareH264();
+        this.log("hardware H.264 is only offered as Baseline here, so streams use that");
+        await withOurConnections(() => this.room.connect(url, token, { autoSubscribe: false }));
+      } else {
+        await this.room.connect(url, token, { autoSubscribe: false });
+      }
       this.log(`connected to ${this.room.name}`);
       this.resolveConnected();
       this.onChange();
@@ -186,7 +197,7 @@ export class Session {
     try {
       const size = await Promise.race([video.frameSize ?? Promise.resolve(null), sleep(3000).then(() => null)]);
       const hardware = videoCodec === "h264" && size
-        ? await hasHardwareH264({ width: size.width, height: size.height, fps: preset.fps, bitrate: preset.maxBitrate })
+        ? await hasHardwareH264({ width: size.width, height: size.height, fps: preset.fps, bitrate: preset.maxBitrate, profile: this.baselineH264 ? "42001f" : "42e01f" })
         : false;
       const sizeNote = size ? `${size.width}x${size.height}` : "unknown size";
       this.log(`hardware ${videoCodec} encoder for ${sizeNote}: ${hardware === null ? "unknown" : hardware ? "yes" : "no"}`);

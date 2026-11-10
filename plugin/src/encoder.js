@@ -2,18 +2,19 @@
 // encoding costs almost no CPU. Software encoding at 1080p can take more CPU than a
 // laptop has to spare next to a game, and then WebRTC shrinks the picture to keep up.
 
-// The H.264 that LiveKit negotiates: constrained baseline.
+// The H.264 that LiveKit negotiates: constrained baseline. See h264-hardware.js for
+// when Chromium encodes it as Baseline (42001f) instead.
 const H264 = "video/H264;level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f";
 const SOFTWARE = /OpenH264|libvpx|libaom|dav1d|SVT|FFmpeg/i;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Whether the browser has a hardware H.264 encoder for this size: true, false, or null if it won't say. */
-export async function hasHardwareH264({ width, height, fps, bitrate }) {
+export async function hasHardwareH264({ width, height, fps, bitrate, profile = "42e01f" }) {
   try {
     const info = await navigator.mediaCapabilities.encodingInfo({
       type: "webrtc",
-      video: { contentType: H264, width, height, bitrate, framerate: fps },
+      video: { contentType: H264.replace("42e01f", profile), width, height, bitrate, framerate: fps },
     });
     return info.supported ? info.powerEfficient : false;
   } catch {
