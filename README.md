@@ -31,7 +31,7 @@ which removes BYO Stream. Running it again also updates BYO Stream.
 
 ### Windows
 
-1. Download **[discord-byo-stream-windows-v0.1.0.zip](https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.0/discord-byo-stream-windows-v0.1.0.zip)**.
+1. Download **[discord-byo-stream-windows-v0.1.1.zip](https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.1/discord-byo-stream-windows-v0.1.1.zip)**.
 2. Right-click the zip, choose **Extract All**, then **Extract**.
 3. In the folder that opens, double-click **Install.cmd**.
    - If Windows says it protected your PC, click **More info**, then **Run anyway**.
@@ -44,14 +44,14 @@ Discord restarts with BYO Stream. **Uninstall.cmd**, in the same folder, removes
 <summary>Or install from PowerShell</summary>
 
 ```powershell
-irm https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.0/install.ps1 | iex
+irm https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.1/install.ps1 | iex
 ```
 
 To pass the answers instead of typing them, or to uninstall:
 
 ```powershell
-& ([scriptblock]::Create((irm https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.0/install.ps1))) -Server https://streams.example.com YOUR-KEY
-& ([scriptblock]::Create((irm https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.0/install.ps1))) -Uninstall
+& ([scriptblock]::Create((irm https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.1/install.ps1))) -Server https://streams.example.com YOUR-KEY
+& ([scriptblock]::Create((irm https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.1/install.ps1))) -Uninstall
 ```
 </details>
 
@@ -62,7 +62,7 @@ The easiest way is one line in Terminal:
 1. Open **Terminal** (press Cmd+Space, type `Terminal`, press Return).
 2. Paste this and press Return:
    ```sh
-   curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.0/install.sh | sh
+   curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.1/install.sh | sh
    ```
 3. Type or paste the server address, press Return, then the access key, and press
    Return.
@@ -75,7 +75,7 @@ Discord closes and reopens with BYO Stream.
 <details>
 <summary>Or download it and double-click</summary>
 
-1. Download **[discord-byo-stream-macos-v0.1.0.zip](https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.0/discord-byo-stream-macos-v0.1.0.zip)**
+1. Download **[discord-byo-stream-macos-v0.1.1.zip](https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.1/discord-byo-stream-macos-v0.1.1.zip)**
    and open it, if your browser didn't already.
 2. Double-click **Install.command**. The first time, macOS says it can't verify it,
    because BYO Stream isn't from the App Store or signed by Apple:
@@ -92,7 +92,7 @@ Discord closes and reopens with BYO Stream.
 To uninstall from Terminal:
 
 ```sh
-curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.0/install.sh | sh -s -- --uninstall
+curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.1/install.sh | sh -s -- --uninstall
 ```
 
 ### Linux
@@ -100,12 +100,12 @@ curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v
 Close Discord fully (including its tray icon), then in a terminal:
 
 ```sh
-curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/linux-v0.1.0/install.sh | sh
+curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/linux-v0.1.1/install.sh | sh
 ```
 
 It asks for the server address and access key; then open Discord. To uninstall, add
 `-s -- --uninstall` after `sh`. You can also download
-[discord-byo-stream-linux-v0.1.0.tar.gz](https://github.com/ADCDS/discord-byo-stream/releases/download/linux-v0.1.0/discord-byo-stream-linux-v0.1.0.tar.gz),
+[discord-byo-stream-linux-v0.1.1.tar.gz](https://github.com/ADCDS/discord-byo-stream/releases/download/linux-v0.1.1/discord-byo-stream-linux-v0.1.1.tar.gz),
 unpack it and run `sh install.sh` in its folder.
 
 This needs Discord's `.deb` or `.tar.gz` from discord.com. The Flatpak and Snap
@@ -116,10 +116,10 @@ versions keep their files read-only, so BYO Stream can't be added to them.
 To skip the questions, put the server and key in the command:
 
 ```sh
-curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.0/install.sh | sh -s -- --server https://streams.example.com YOUR-KEY
+curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.1/install.sh | sh -s -- --server https://streams.example.com YOUR-KEY
 ```
 
-(Use the `linux-v0.1.0` address on Linux.) If you run a server,
+(Use the `linux-v0.1.1` address on Linux.) If you run a server,
 `python3 keys.py add <name>` prints a message with everything a friend needs.
 
 ## Using it
@@ -141,7 +141,9 @@ sound also asks to record audio.
 stream tile, as usual. Right-click a stream to change its volume.
 
 A stream can take a few seconds to reach full sharpness: it starts at a lower quality
-and steps up as the connection allows.
+and steps up as the connection allows. Streams use your computer's hardware video
+encoder where Discord's browser engine offers it, as on Macs, so streaming next to a
+game costs little CPU. Otherwise the picture may shrink when the CPU is busy.
 
 If a Discord update breaks the Go Live buttons, BYO Stream shows its own small panel
 instead. **Ctrl+Alt+V** opens that panel at any time, with stream stats.
