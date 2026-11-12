@@ -2,6 +2,7 @@
 import { capture, getDisplayName, getStore, getUserId, getVoiceChannelId, listSources, systemAudioBlocker } from "./discord.js";
 import { runBenchmark } from "./benchmark.js";
 import { describeEncoders } from "./encoder.js";
+import { warmUpH264Decoding } from "./h264-warmup.js";
 import { NativeBridge } from "./native.js";
 import { MODES, QUALITY, Session } from "./session.js";
 import { publisherStats, viewerStats } from "./stats.js";
@@ -97,6 +98,7 @@ class ByoStream {
     this.statsTimer = setInterval(() => this.refreshStats(), STATS_MS);
     this.tick();
     this.log(`started v${VERSION}`);
+    warmUpH264Decoding(this.log);
     describeEncoders().then((line) => this.log(`video encoders: ${line}`)).catch(() => {});
   }
 
