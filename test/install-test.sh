@@ -98,6 +98,13 @@ fails() { ! run "$@"; }
 lock_free() {
   if command -v shlock >/dev/null 2>&1; then test ! -e "$1"; else flock -n "$1" true; fi
 }
+stale_lock() {
+  # Use a real exited child PID. macOS shlock deliberately refuses to reclaim a
+  # lock with the same ctime second as its temporary lock, so let it age first.
+  owner=$(sh -c 'printf "%s\n" "$$"')
+  printf '%s\n' "$owner" > "$1"
+  if command -v shlock >/dev/null 2>&1; then sleep 2; fi
+}
 
 check "unable to ask, a missing server is an error" fails KEY_abc
 check "unable to ask, a missing key is an error" fails --server "$SERVER"
@@ -147,7 +154,7 @@ run --repair >/dev/null
 check "repair does not quit a running Discord" test -e "$work/running"
 check "repair leaves a running Discord untouched" grep -q 'REAL ASAR while running' "$res/app.asar"
 rm -f "$work/running"
-printf '99999999\n' > "$data/.install-lock"
+stale_lock "$data/.install-lock"
 run --repair >/dev/null
 check "repair recovers an abandoned installer lock" lock_free "$data/.install-lock"
 if command -v shlock >/dev/null 2>&1; then
@@ -243,7 +250,7 @@ check "deferred update leaves current version" sh -c '[ "$(cat "$1/version")" !=
 check "deferred update can retry when Discord closes" test ! -e "$data/update-checked"
 check "deferred update does not close Discord" test -e "$work/running"
 rm -f "$work/running" "$work/open-on-download"
-printf '99999999\n' > "$data/.update-lock"
+stale_lock "$data/.update-lock"
 update > "$work/update.out"
 check "helper selects numeric latest stable macOS version" grep -q '^0.1.10$' "$data/version"
 check "helper keeps saved server and key" grep -q '"accessKey":"KEY_local","server":"https://streams.example.com"' "$data/config.json"
