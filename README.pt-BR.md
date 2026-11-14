@@ -27,13 +27,14 @@ como `https://streams.exemplo.com`) e **a sua chave de acesso**. Não passe a ch
 ninguém: é ela que dá acesso ao servidor.
 
 Use o aplicativo oficial do Discord, de [discord.com](https://discord.com/download), e
-abra-o pelo menos uma vez antes de instalar. Rode o instalador de novo depois de cada
-atualização do Discord, que remove o BYO Stream. Rodar de novo também atualiza o BYO
-Stream.
+abra-o pelo menos uma vez antes de instalar. As atualizações do Discord removem o BYO
+Stream. No macOS, um auxiliar em segundo plano restaura ele com o Discord fechado.
+No Windows e Linux, rode o instalador de novo depois de uma atualização. Reinstalar
+também atualiza o BYO Stream.
 
 ### Windows
 
-1. Baixe **[discord-byo-stream-windows-v0.1.2.zip](https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.2/discord-byo-stream-windows-v0.1.2.zip)**.
+1. Baixe **[discord-byo-stream-windows-v0.1.3.zip](https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.3/discord-byo-stream-windows-v0.1.3.zip)**.
 2. Clique com o botão direito no zip, escolha **Extrair Tudo** e depois **Extrair**.
 3. Na pasta que abrir, dê dois cliques em **Install.cmd**.
    - Se aparecer "O Windows protegeu o computador", clique em **Mais informações** e
@@ -48,14 +49,14 @@ O Discord reinicia já com o BYO Stream. O **Uninstall.cmd**, na mesma pasta, re
 <summary>Ou instale pelo PowerShell</summary>
 
 ```powershell
-irm https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.2/install.ps1 | iex
+irm https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.3/install.ps1 | iex
 ```
 
 Para passar as respostas em vez de digitar, ou para desinstalar:
 
 ```powershell
-& ([scriptblock]::Create((irm https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.2/install.ps1))) -Server https://streams.exemplo.com SUA-CHAVE
-& ([scriptblock]::Create((irm https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.2/install.ps1))) -Uninstall
+& ([scriptblock]::Create((irm https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.3/install.ps1))) -Server https://streams.exemplo.com SUA-CHAVE
+& ([scriptblock]::Create((irm https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.3/install.ps1))) -Uninstall
 ```
 </details>
 
@@ -66,7 +67,7 @@ O jeito mais fácil é uma linha no Terminal:
 1. Abra o **Terminal** (aperte Cmd+Espaço, digite `Terminal` e aperte Return).
 2. Cole isto e aperte Return:
    ```sh
-   curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.2/install.sh | sh
+   curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.3/install.sh | sh
    ```
 3. Digite ou cole o endereço do servidor e aperte Return. Depois, a chave de acesso, e
    Return.
@@ -75,12 +76,27 @@ O jeito mais fácil é uma linha no Terminal:
    **Gerenciamento de Apps** e ative o **Terminal**. Feche o Terminal (Cmd+Q), abra de
    novo e repita o passo 2.
 
-O Discord fecha e abre de novo já com o BYO Stream.
+O Discord fecha e abre de novo já com o BYO Stream. Reinstalar mantém o servidor e a
+chave salvos, sem precisar digitar de novo.
+
+O instalador do macOS também registra um auxiliar em segundo plano. A cada minuto,
+com o Discord totalmente fechado, ele restaura o BYO Stream se o Discord atualizou.
+Também verifica diariamente novas versões estáveis para macOS neste repositório e
+confere os checksums dos arquivos antes de instalar. Ele nunca fecha o Discord nem
+interrompe chamadas. Depois de uma atualização do Discord, **feche o Discord por
+completo, espere um minuto e abra de novo**.
+
+O macOS pode bloquear mudanças feitas pelo auxiliar mesmo com a permissão do
+Terminal. Se a restauração automática falhar, rode o instalador pelo Terminal; os
+erros ficam no `updater.log`, na pasta de logs abaixo. Para não usar o auxiliar ou
+removê-lo, acrescente `-s -- --no-auto-update` depois de `sh` no comando de instalação.
+Desinstalar também remove o auxiliar. Instaladores distribuídos pelo seu VPS
+restauram o gancho localmente; novas versões continuam vindo de quem mantém o servidor.
 
 <details>
 <summary>Ou baixe e dê dois cliques</summary>
 
-1. Baixe **[discord-byo-stream-macos-v0.1.2.zip](https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.2/discord-byo-stream-macos-v0.1.2.zip)**
+1. Baixe **[discord-byo-stream-macos-v0.1.3.zip](https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.3/discord-byo-stream-macos-v0.1.3.zip)**
    e abra o arquivo, se o navegador ainda não tiver aberto.
 2. Dê dois cliques em **Install.command**. Na primeira vez, o macOS diz que não
    consegue verificá-lo, porque o BYO Stream não vem da App Store nem é assinado pela
@@ -99,7 +115,7 @@ O **Uninstall.command** remove, depois da mesma liberação da primeira vez.
 Para desinstalar pelo Terminal:
 
 ```sh
-curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.2/install.sh | sh -s -- --uninstall
+curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.3/install.sh | sh -s -- --uninstall
 ```
 
 ### Linux
@@ -107,12 +123,12 @@ curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v
 Feche o Discord por completo (inclusive o ícone na bandeja) e, num terminal:
 
 ```sh
-curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/linux-v0.1.2/install.sh | sh
+curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/linux-v0.1.3/install.sh | sh
 ```
 
 Ele pede o endereço do servidor e a chave de acesso; depois é só abrir o Discord. Para
 desinstalar, acrescente `-s -- --uninstall` depois do `sh`. Você também pode baixar o
-[discord-byo-stream-linux-v0.1.2.tar.gz](https://github.com/ADCDS/discord-byo-stream/releases/download/linux-v0.1.2/discord-byo-stream-linux-v0.1.2.tar.gz),
+[discord-byo-stream-linux-v0.1.3.tar.gz](https://github.com/ADCDS/discord-byo-stream/releases/download/linux-v0.1.3/discord-byo-stream-linux-v0.1.3.tar.gz),
 descompactar e rodar `sh install.sh` na pasta dele.
 
 Precisa do `.deb` ou do `.tar.gz` do Discord, de discord.com. As versões Flatpak e Snap
@@ -124,10 +140,10 @@ elas.
 Para pular as perguntas, coloque o servidor e a chave no comando:
 
 ```sh
-curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.2/install.sh | sh -s -- --server https://streams.exemplo.com SUA-CHAVE
+curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.3/install.sh | sh -s -- --server https://streams.exemplo.com SUA-CHAVE
 ```
 
-(No Linux, use o endereço com `linux-v0.1.2`.) Se você mantém um servidor, o comando
+(No Linux, use o endereço com `linux-v0.1.3`.) Se você mantém um servidor, o comando
 `python3 keys.py add <nome>` gera uma mensagem com tudo o que um amigo precisa.
 
 ## Como usar
@@ -193,9 +209,12 @@ Discord Flatpak ou Snap não é suportado.
 fora do ar). Copie o endereço do servidor e a chave de novo, exatamente como recebeu.
 Se estiverem certos, o servidor pode estar fora do ar: fale com quem mantém ele.
 
-**O botão de compartilhar tela sumiu ou não faz nada.** Feche o Discord por completo
-(pelo ícone na bandeja ou na barra de menus, não só a janela) e abra de novo. Se o
-Discord atualizou, rode o instalador de novo.
+**O botão de compartilhar tela está bloqueado, sumiu ou não faz nada.** Uma atualização
+do Discord pode ter removido o BYO Stream, voltando o bloqueio regional. Feche o
+Discord por completo (pelo ícone na bandeja ou na barra de menus, não só a janela).
+No macOS, espere um minuto pelo auxiliar e abra de novo. Se continuar bloqueado, ou
+no Windows/Linux, rode o instalador de novo. Quem transmite e quem assiste precisam
+do BYO Stream funcionando.
 
 **Meus amigos não veem a minha transmissão.** Eles também precisam do BYO Stream,
 instalado com o mesmo servidor, e precisam estar no mesmo canal de voz.
@@ -205,7 +224,7 @@ transmitindo deve parar e começar a transmissão de novo.
 
 **Logs.** O BYO Stream grava logs numa pasta `discord-byo-stream`: em `%APPDATA%` no
 Windows, em `~/Library/Application Support` no macOS e em `~/.config` no Linux. O
-`plugin.log` e o `main.log` registram o que aconteceu, e o `status.json` mostra as
+`plugin.log`, o `main.log` e (no macOS) o `updater.log` registram o que aconteceu, e o `status.json` mostra as
 transmissões do momento. Eles nunca contêm a sua chave de acesso, então pode mandá-los
 quando for pedir ajuda.
 

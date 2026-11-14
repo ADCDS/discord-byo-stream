@@ -26,6 +26,12 @@ Or paste this into Terminal:
 \`\`\`sh
 curl -fsSL $url/install.sh | sh
 \`\`\`
+
+Restores BYO Stream after Discord updates while Discord is closed, and checks daily
+for new macOS BYO Stream versions. Quit Discord, wait a minute, then open it again.
+Reinstalling keeps your saved server and key. Add \`-s -- --no-auto-update\` after
+\`sh\` to disable the helper. If macOS blocks background changes, rerun the installer
+from Terminal; helper errors are in \`updater.log\`.
 MD
     ;;
   linux)
@@ -40,5 +46,5 @@ MD
 esac
 cat <<MD
 
-Step-by-step guide: [English]($guide) · [Português (Brasil)]($guide_pt). Run the installer again after a Discord update. \`SHA256SUMS.txt\` lists the checksums of every file.
+Step-by-step guide: [English]($guide) · [Português (Brasil)]($guide_pt). If streaming stays locked after a Discord update, run the installer again. \`SHA256SUMS.txt\` lists the checksums of every file.
 MD

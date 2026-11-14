@@ -23,12 +23,16 @@ const release = process.env.BYO_RELEASE;
 let outDir;
 let defaultServer;
 let payloadUrl;
+let updateApi = "";
+let releaseRoot = "";
 if (release) {
   if (!["linux", "macos", "windows"].includes(release)) throw new Error(`BYO_RELEASE must be linux, macos or windows, got "${release}"`);
   const repo = process.env.GITHUB_REPOSITORY || "ADCDS/discord-byo-stream";
   outDir = join(root, "dist", "release-files", release);
   defaultServer = "";
   payloadUrl = `https://github.com/${repo}/releases/download/${release}-v${version}`;
+  updateApi = `https://api.github.com/repos/${repo}/releases?per_page=100`;
+  releaseRoot = `https://github.com/${repo}/releases/download`;
 } else {
   const configFile = join(root, "byo-stream.config.json");
   const config = existsSync(configFile) ? JSON.parse(readFileSync(configFile, "utf8")) : {};
@@ -58,10 +62,12 @@ await build({
     __VERSION__: JSON.stringify(version),
   },
 });
-for (const file of ["main.js", "app-index.js", "audio-source.js", "linux-audio.js", "install.sh", "install.ps1"]) {
+for (const file of ["main.js", "app-index.js", "audio-source.js", "linux-audio.js", "install.sh", "install.ps1", "update.sh"]) {
   const text = readFileSync(join(installer, file), "utf8")
     .replaceAll("__BYO_DEFAULT_SERVER__", defaultServer)
     .replaceAll("__BYO_PAYLOAD_URL__", payloadUrl)
+    .replaceAll("__BYO_UPDATE_API__", updateApi)
+    .replaceAll("__BYO_RELEASE_ROOT__", releaseRoot)
     .replaceAll("__BYO_VERSION__", version);
   if (/__BYO_[A-Z_]+__/.test(text)) throw new Error(`${file} has an unknown placeholder: ${text.match(/__BYO_[A-Z_]+__/)[0]}`);
   writeFileSync(join(outDir, file), text);

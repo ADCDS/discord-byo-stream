@@ -26,12 +26,13 @@ You need two things from whoever runs your server: **the server address** (like
 what lets you onto the server.
 
 Use the official Discord app from [discord.com](https://discord.com/download), and open
-it at least once before installing. Run the installer again after every Discord update,
-which removes BYO Stream. Running it again also updates BYO Stream.
+it at least once before installing. Discord updates remove BYO Stream. On macOS, a
+background helper restores it while Discord is closed. On Windows and Linux, run the
+installer again after an update. Reinstalling also updates BYO Stream.
 
 ### Windows
 
-1. Download **[discord-byo-stream-windows-v0.1.2.zip](https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.2/discord-byo-stream-windows-v0.1.2.zip)**.
+1. Download **[discord-byo-stream-windows-v0.1.3.zip](https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.3/discord-byo-stream-windows-v0.1.3.zip)**.
 2. Right-click the zip, choose **Extract All**, then **Extract**.
 3. In the folder that opens, double-click **Install.cmd**.
    - If Windows says it protected your PC, click **More info**, then **Run anyway**.
@@ -44,14 +45,14 @@ Discord restarts with BYO Stream. **Uninstall.cmd**, in the same folder, removes
 <summary>Or install from PowerShell</summary>
 
 ```powershell
-irm https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.2/install.ps1 | iex
+irm https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.3/install.ps1 | iex
 ```
 
 To pass the answers instead of typing them, or to uninstall:
 
 ```powershell
-& ([scriptblock]::Create((irm https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.2/install.ps1))) -Server https://streams.example.com YOUR-KEY
-& ([scriptblock]::Create((irm https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.2/install.ps1))) -Uninstall
+& ([scriptblock]::Create((irm https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.3/install.ps1))) -Server https://streams.example.com YOUR-KEY
+& ([scriptblock]::Create((irm https://github.com/ADCDS/discord-byo-stream/releases/download/windows-v0.1.3/install.ps1))) -Uninstall
 ```
 </details>
 
@@ -62,7 +63,7 @@ The easiest way is one line in Terminal:
 1. Open **Terminal** (press Cmd+Space, type `Terminal`, press Return).
 2. Paste this and press Return:
    ```sh
-   curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.2/install.sh | sh
+   curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.3/install.sh | sh
    ```
 3. Type or paste the server address, press Return, then the access key, and press
    Return.
@@ -70,12 +71,26 @@ The easiest way is one line in Terminal:
    **Privacy & Security** > **App Management**, and turn on **Terminal**. Quit Terminal
    (Cmd+Q), open it again, and repeat step 2.
 
-Discord closes and reopens with BYO Stream.
+Discord closes and reopens with BYO Stream. Reinstalling keeps your saved server and
+access key, so you don't need to type them again.
+
+The macOS installer also registers a background helper. Once a minute, while Discord
+is fully closed, it restores BYO Stream if Discord updated. It also checks daily for
+new stable macOS BYO Stream releases from this repository and verifies their file
+checksums before installing. It never quits Discord or interrupts a call. After a
+Discord update, **quit Discord, wait a minute, then open it again**.
+
+macOS can block the helper from changing Discord even if Terminal has permission.
+If automatic repair fails, rerun the installer from Terminal; `updater.log` in the
+logs folder below records helper errors. To skip or remove the helper, add
+`-s -- --no-auto-update` after `sh` in the install command. Uninstalling removes it
+too. Installers served by your own VPS repair the hook locally; new BYO versions
+still come from whoever runs that server.
 
 <details>
 <summary>Or download it and double-click</summary>
 
-1. Download **[discord-byo-stream-macos-v0.1.2.zip](https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.2/discord-byo-stream-macos-v0.1.2.zip)**
+1. Download **[discord-byo-stream-macos-v0.1.3.zip](https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.3/discord-byo-stream-macos-v0.1.3.zip)**
    and open it, if your browser didn't already.
 2. Double-click **Install.command**. The first time, macOS says it can't verify it,
    because BYO Stream isn't from the App Store or signed by Apple:
@@ -92,7 +107,7 @@ Discord closes and reopens with BYO Stream.
 To uninstall from Terminal:
 
 ```sh
-curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.2/install.sh | sh -s -- --uninstall
+curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.3/install.sh | sh -s -- --uninstall
 ```
 
 ### Linux
@@ -100,12 +115,12 @@ curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v
 Close Discord fully (including its tray icon), then in a terminal:
 
 ```sh
-curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/linux-v0.1.2/install.sh | sh
+curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/linux-v0.1.3/install.sh | sh
 ```
 
 It asks for the server address and access key; then open Discord. To uninstall, add
 `-s -- --uninstall` after `sh`. You can also download
-[discord-byo-stream-linux-v0.1.2.tar.gz](https://github.com/ADCDS/discord-byo-stream/releases/download/linux-v0.1.2/discord-byo-stream-linux-v0.1.2.tar.gz),
+[discord-byo-stream-linux-v0.1.3.tar.gz](https://github.com/ADCDS/discord-byo-stream/releases/download/linux-v0.1.3/discord-byo-stream-linux-v0.1.3.tar.gz),
 unpack it and run `sh install.sh` in its folder.
 
 This needs Discord's `.deb` or `.tar.gz` from discord.com. The Flatpak and Snap
@@ -116,10 +131,10 @@ versions keep their files read-only, so BYO Stream can't be added to them.
 To skip the questions, put the server and key in the command:
 
 ```sh
-curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.2/install.sh | sh -s -- --server https://streams.example.com YOUR-KEY
+curl -fsSL https://github.com/ADCDS/discord-byo-stream/releases/download/macos-v0.1.3/install.sh | sh -s -- --server https://streams.example.com YOUR-KEY
 ```
 
-(Use the `linux-v0.1.2` address on Linux.) If you run a server,
+(Use the `linux-v0.1.3` address on Linux.) If you run a server,
 `python3 keys.py add <name>` prints a message with everything a friend needs.
 
 ## Using it
@@ -180,9 +195,11 @@ supported.
 and key again, exactly as you got them. If they're right, the server may be down: ask
 whoever runs it.
 
-**The Share Your Screen button is missing or does nothing.** Quit Discord fully (from
-its tray or menu bar icon, not just the window) and open it again. If Discord updated,
-run the installer again.
+**The Share Your Screen button is locked, missing or does nothing.** A Discord update
+may have removed BYO Stream, restoring Discord's regional streaming lock. Quit Discord
+fully (from its tray or menu bar icon, not just the window). On macOS, wait a minute
+for the helper, then reopen it. If it is still locked, or on Windows/Linux, run the
+installer again. Both the streamer and viewers need BYO Stream working.
 
 **My friends can't see my stream.** They need BYO Stream too, set up with the same
 server, and they must be in the same voice channel.
@@ -192,9 +209,9 @@ should stop and start the stream again.
 
 **Logs.** BYO Stream writes logs to a `discord-byo-stream` folder: in
 `%APPDATA%` on Windows, `~/Library/Application Support` on macOS, and `~/.config` on
-Linux. `plugin.log` and `main.log` record what happened, and `status.json` shows the
-current streams. They never contain your access key, so you can share them when asking
-for help.
+Linux. `plugin.log`, `main.log` and (on macOS) `updater.log` record what happened.
+`status.json` shows the current streams. They never contain your access key, so you
+can share them when asking for help.
 
 ## Run your own server
 
@@ -215,6 +232,9 @@ A small VPS with a domain name is enough for a group of friends. See
   Discord's camera stays off, since it would go through Discord.
 - **The server** (`server/`) swaps a per-person access key for a short-lived LiveKit
   token for one voice channel's room. Each Discord voice channel gets its own room.
+- **The macOS helper** (`installer/update.sh`) runs outside Discord as the per-user
+  `com.byo-stream.updater` LaunchAgent. It repairs the installed hook without needing
+  the VPS online, and installs new GitHub releases only while Discord is closed.
 
 The installer saves the server address and key in `config.json` in the logs folder
 above, readable only by you. The audio rules are in `installer/audio-source.js` (macOS
@@ -254,8 +274,9 @@ one-line installs. Update the download links in both READMEs when the version ch
 
 ## Known limits
 
-- A Discord update replaces `app.asar` and silently removes BYO Stream. Run the
-  installer again after one.
+- A Discord update replaces `app.asar` and removes BYO Stream. The macOS helper waits
+  until Discord is closed before repairing it, and macOS permissions can block it.
+  Windows/Linux still need the installer rerun after each Discord update.
 - LIVE badges only show for people in your voice channel who have BYO Stream.
 - No stream preview thumbnails, and no camera.
 - On macOS 14 and older, window capture uses Chromium's older capturer, which can be

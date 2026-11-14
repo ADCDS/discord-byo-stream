@@ -6,7 +6,7 @@ set -eu
 platform=${1:-}
 root=$(cd "$(dirname "$0")/.." && pwd)
 case "$platform" in
-  linux|macos) files="install.sh main.js plugin.js app-index.js audio-source.js linux-audio.js" ;;
+  linux|macos) files="install.sh update.sh main.js plugin.js app-index.js audio-source.js linux-audio.js" ;;
   windows) files="install.ps1 main.js plugin.js app-index.js audio-source.js" ;;
   *) echo "usage: $0 linux|macos|windows" >&2; exit 2 ;;
 esac
@@ -57,8 +57,11 @@ BYO Stream $version for macOS
 3. If it says macOS blocked changes to Discord.app: in System Settings > Privacy &
    Security > App Management, turn on Terminal, then double-click Install.command again.
 
-Discord restarts by itself. Run Install.command again after a Discord update, and to
-update BYO Stream. Uninstall.command removes it.
+Discord restarts by itself. A background helper restores BYO Stream after Discord
+updates and checks daily for new BYO Stream versions, while Discord is closed.
+If an update removes streaming, quit Discord, wait a minute, then open it again.
+If macOS blocks the helper, run Install.command again from Terminal.
+Uninstall.command removes BYO Stream and its background helper.
 
 Help: https://github.com/ADCDS/discord-byo-stream
 TXT

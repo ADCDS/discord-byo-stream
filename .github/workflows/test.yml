@@ -46,7 +46,10 @@ jobs:
 
       - name: Test the installer (Linux, macOS)
         if: matrix.platform != 'windows'
-        run: sh test/install-test.sh "dist/release-files/${{ matrix.platform }}"
+        run: |
+          sh -n dist/release-files/${{ matrix.platform }}/install.sh
+          sh -n dist/release-files/${{ matrix.platform }}/update.sh
+          sh test/install-test.sh "dist/release-files/${{ matrix.platform }}"
 
       - name: Test the installer (Windows)
         if: matrix.platform == 'windows'
